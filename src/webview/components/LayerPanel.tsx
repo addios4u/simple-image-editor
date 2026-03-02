@@ -1,4 +1,5 @@
 import React from 'react';
+import { Eye, EyeOff, Plus, Minus } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
 
 const LayerPanel: React.FC = () => {
@@ -30,7 +31,7 @@ const LayerPanel: React.FC = () => {
               }}
               aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
             >
-              {layer.visible ? '👁' : '—'}
+              {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
             </button>
             <span className="layer-name">{layer.name}</span>
             <input
@@ -56,14 +57,14 @@ const LayerPanel: React.FC = () => {
           onClick={addLayer}
           aria-label="Add Layer"
         >
-          +
+          <Plus size={16} />
         </button>
         <button
           className="toolbar-btn"
           onClick={() => removeLayer(activeLayerId)}
           aria-label="Delete Layer"
         >
-          −
+          <Minus size={16} />
         </button>
       </div>
     </div>
