@@ -6,8 +6,6 @@ const ViewerMode: React.FC = () => {
   const zoom = useEditorStore((s) => s.zoom);
   const panX = useEditorStore((s) => s.panX);
   const panY = useEditorStore((s) => s.panY);
-  const canvasWidth = useEditorStore((s) => s.canvasWidth);
-  const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const imageData = useEditorStore((s) => s.imageData);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
   const setMode = useEditorStore((s) => s.setMode);
@@ -44,8 +42,6 @@ const ViewerMode: React.FC = () => {
         <canvas
           ref={canvasRef}
           data-testid="viewer-canvas"
-          width={canvasWidth}
-          height={canvasHeight}
         />
       </div>
       <button
