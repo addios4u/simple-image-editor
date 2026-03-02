@@ -1,0 +1,36 @@
+# Oh My Claudecode
+.omc/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# VSCode extension packages
+*.vsix
+
+# Rust build artifacts
+target/
+src/engine/target/
+
+# WASM build output in dist
+dist/wasm/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.log
