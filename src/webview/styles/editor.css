@@ -221,6 +221,18 @@ canvas {
   color: var(--text-secondary);
 }
 
+.zoom-label.clickable {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 2px 4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.zoom-label.clickable:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 /* Mode segment */
 .mode-segment {
   display: flex;

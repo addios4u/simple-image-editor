@@ -34,7 +34,7 @@ const Toolbar: React.FC = () => {
       <button className="toolbar-btn" onClick={zoomOut} title="Zoom Out">
         <Minus size={14} />
       </button>
-      <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+      <span className="zoom-label clickable" onClick={() => setZoom(1)} title="Reset to 100%">{Math.round(zoom * 100)}%</span>
       <button className="toolbar-btn" onClick={zoomIn} title="Zoom In">
         <Plus size={14} />
       </button>

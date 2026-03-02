@@ -102,17 +102,35 @@ const ViewerMode: React.FC = () => {
         <button className="toolbar-btn" onClick={zoomOut} title="Zoom Out">
           <Minus size={14} />
         </button>
-        <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+        <span className="zoom-label clickable" onClick={() => setZoom(1)} title="Reset to 100%">{Math.round(zoom * 100)}%</span>
         <button className="toolbar-btn" onClick={zoomIn} title="Zoom In">
           <Plus size={14} />
         </button>
         <div className="toolbar-separator" />
-        <button
-          className="color-swatch-btn"
-          style={{ background: fillColor }}
-          onClick={pickColor}
-          title="Pick Color (Eyedropper)"
-        />
+        <div className="color-picker-group">
+          <button
+            className="color-swatch-btn"
+            style={{ background: fillColor }}
+            onClick={pickColor}
+            title="Pick Color (Eyedropper)"
+          />
+          <div className="color-info">
+            <span
+              className={`color-hex${copied === fillColor ? ' copied' : ''}`}
+              onClick={() => copyToClipboard(fillColor)}
+              title="Copy HEX"
+            >
+              {fillColor}
+            </span>
+            <span
+              className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
+              onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
+              title="Copy RGB"
+            >
+              rgb({hexToRgb(fillColor)})
+            </span>
+          </div>
+        </div>
         <span className="toolbar-file-label">
           {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
         </span>
