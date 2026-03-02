@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useCallback } from 'react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ZoomControls from './ZoomControls';
+import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { SelectionTool } from '../tools/SelectionTool';
 import { MarqueeTool } from '../tools/MarqueeTool';
@@ -39,8 +40,11 @@ const Canvas: React.FC = () => {
   const zoom = useEditorStore((s) => s.zoom);
   const panX = useEditorStore((s) => s.panX);
   const panY = useEditorStore((s) => s.panY);
+  const setPan = useEditorStore((s) => s.setPan);
   const activeTool = useEditorStore((s) => s.activeTool);
 
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
 
   const tool = useMemo(() => {
@@ -73,7 +77,7 @@ const Canvas: React.FC = () => {
   );
 
   return (
-    <div className="canvas-container">
+    <div className="canvas-container" ref={containerRef}>
       <div
         className="canvas-wrapper"
         style={{
@@ -81,6 +85,7 @@ const Canvas: React.FC = () => {
         }}
       >
         <canvas
+          ref={canvasRef}
           data-testid="editor-canvas"
           width={canvasWidth}
           height={canvasHeight}
@@ -90,7 +95,15 @@ const Canvas: React.FC = () => {
           onPointerUp={handlePointerUp}
         />
       </div>
-      <ZoomControls />
+      <Minimap
+        mode="transform"
+        sourceCanvas={canvasRef.current}
+        containerEl={containerRef.current}
+        zoom={zoom}
+        panX={panX}
+        panY={panY}
+        setPan={setPan}
+      />
     </div>
   );
 };

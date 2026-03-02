@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { useEditorStore } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
+import Minimap from './Minimap';
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -154,6 +155,12 @@ const ViewerMode: React.FC = () => {
         >
           <canvas ref={canvasRef} data-testid="viewer-canvas" />
         </div>
+        <Minimap
+          mode="scroll"
+          sourceCanvas={canvasRef.current}
+          containerEl={areaRef.current}
+          zoom={zoom}
+        />
       </div>
     </>
   );
