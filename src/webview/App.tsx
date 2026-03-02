@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useEditorStore } from './state/editorStore';
 import ViewerMode from './components/ViewerMode';
 import EditorMode from './components/EditorMode';
+import vscodeApi from './vscode';
 interface InitMessage {
     type: 'init';
     body: { data: number[]; fileName: string; isUntitled: boolean };
@@ -20,6 +21,8 @@ const App: React.FC = () => {
             }
         };
         window.addEventListener('message', handler);
+        // Signal extension host that the webview is ready to receive data
+        vscodeApi.postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', handler);
     }, [setImageData]);
 
