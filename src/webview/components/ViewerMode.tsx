@@ -11,6 +11,19 @@ function hexToRgb(hex: string): string {
   return `${r}, ${g}, ${b}`;
 }
 
+function getMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  switch (ext) {
+    case 'png': return 'image/png';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
+    case 'gif': return 'image/gif';
+    case 'svg': return 'image/svg+xml';
+    case 'bmp': return 'image/bmp';
+    case 'webp': return 'image/webp';
+    default: return 'image/png';
+  }
+}
+
 const ViewerMode: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -36,7 +49,8 @@ const ViewerMode: React.FC = () => {
   useEffect(() => {
     if (!imageData || !canvasRef.current) return;
 
-    const blob = new Blob([imageData.buffer as ArrayBuffer]);
+    const mime = getMimeType(fileName);
+    const blob = new Blob([imageData.buffer as ArrayBuffer], { type: mime });
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
@@ -52,7 +66,7 @@ const ViewerMode: React.FC = () => {
       URL.revokeObjectURL(url);
     };
     img.src = url;
-  }, [imageData, setCanvasSize]);
+  }, [imageData, fileName, setCanvasSize]);
 
   // Drag-to-pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
