@@ -30,6 +30,7 @@ const ViewerMode: React.FC = () => {
 
   const [grabbing, setGrabbing] = useState(false);
   const [copied, setCopied] = useState('');
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   // Draw image on canvas
   useEffect(() => {
@@ -66,12 +67,21 @@ const ViewerMode: React.FC = () => {
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Track cursor position in image coordinates
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const imgX = Math.round((e.clientX - rect.left) / zoom);
+      const imgY = Math.round((e.clientY - rect.top) / zoom);
+      setCursorPos({ x: Math.max(0, imgX), y: Math.max(0, imgY) });
+    }
+
     if (!isDragging.current) return;
     const area = areaRef.current;
     if (!area) return;
     area.scrollLeft = scrollStart.current.x - (e.clientX - dragStart.current.x);
     area.scrollTop = scrollStart.current.y - (e.clientY - dragStart.current.y);
-  }, []);
+  }, [zoom]);
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -162,6 +172,10 @@ const ViewerMode: React.FC = () => {
           sourceCanvas={canvasRef.current}
           containerEl={areaRef.current}
           zoom={zoom}
+          docWidth={canvasWidth}
+          docHeight={canvasHeight}
+          cursorX={cursorPos.x}
+          cursorY={cursorPos.y}
         />
       </div>
     </>

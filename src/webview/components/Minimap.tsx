@@ -3,6 +3,10 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 interface MinimapBaseProps {
   sourceCanvas: HTMLCanvasElement | null;
   zoom: number;
+  docWidth: number;
+  docHeight: number;
+  cursorX: number;
+  cursorY: number;
 }
 
 interface ScrollMinimapProps extends MinimapBaseProps {
@@ -21,22 +25,23 @@ interface TransformMinimapProps extends MinimapBaseProps {
 type MinimapProps = ScrollMinimapProps | TransformMinimapProps;
 
 const MINIMAP_W = 200;
-const MINIMAP_H = 120;
+const THUMB_H = 120;
 
 function getImageLayout(srcW: number, srcH: number) {
-  const scale = Math.min(MINIMAP_W / srcW, MINIMAP_H / srcH);
+  const scale = Math.min(MINIMAP_W / srcW, THUMB_H / srcH);
   const drawW = srcW * scale;
   const drawH = srcH * scale;
   const offsetX = (MINIMAP_W - drawW) / 2;
-  const offsetY = (MINIMAP_H - drawH) / 2;
+  const offsetY = (THUMB_H - drawH) / 2;
   return { scale, drawW, drawH, offsetX, offsetY };
 }
 
 const Minimap: React.FC<MinimapProps> = (props) => {
-  const { sourceCanvas, zoom, containerEl } = props;
+  const { sourceCanvas, zoom, containerEl, docWidth, docHeight, cursorX, cursorY } = props;
   const thumbRef = useRef<HTMLCanvasElement>(null);
   const isDragging = useRef(false);
   const [viewport, setViewport] = useState({ x: 0, y: 0, w: 0, h: 0 });
+  const [viewportPx, setViewportPx] = useState({ w: 0, h: 0 });
 
   // Draw thumbnail
   useEffect(() => {
@@ -46,7 +51,7 @@ const Minimap: React.FC<MinimapProps> = (props) => {
     if (!ctx) return;
 
     thumb.width = MINIMAP_W;
-    thumb.height = MINIMAP_H;
+    thumb.height = THUMB_H;
 
     const srcW = sourceCanvas.width;
     const srcH = sourceCanvas.height;
@@ -54,7 +59,7 @@ const Minimap: React.FC<MinimapProps> = (props) => {
 
     const { drawW, drawH, offsetX, offsetY } = getImageLayout(srcW, srcH);
 
-    ctx.clearRect(0, 0, MINIMAP_W, MINIMAP_H);
+    ctx.clearRect(0, 0, MINIMAP_W, THUMB_H);
     ctx.drawImage(sourceCanvas, offsetX, offsetY, drawW, drawH);
   }, [sourceCanvas, sourceCanvas?.width, sourceCanvas?.height]);
 
@@ -73,6 +78,11 @@ const Minimap: React.FC<MinimapProps> = (props) => {
       const visibleH = containerEl.clientHeight;
       const contentW = srcW * zoom;
       const contentH = srcH * zoom;
+
+      // Viewport size in image pixels
+      const vpPxW = Math.round(Math.min(visibleW / zoom, srcW));
+      const vpPxH = Math.round(Math.min(visibleH / zoom, srcH));
+      setViewportPx({ w: vpPxW, h: vpPxH });
 
       if (contentW <= visibleW && contentH <= visibleH) {
         setViewport({ x: offsetX, y: offsetY, w: drawW, h: drawH });
@@ -93,7 +103,6 @@ const Minimap: React.FC<MinimapProps> = (props) => {
           w: vpW, h: vpH,
         });
       } else {
-        // Transform-based: panX/panY are translation offsets
         const centerX = 0.5 - (props.panX / srcW);
         const centerY = 0.5 - (props.panY / srcH);
         setViewport({
@@ -170,17 +179,33 @@ const Minimap: React.FC<MinimapProps> = (props) => {
   if (!sourceCanvas) return null;
 
   return (
-    <div className="minimap" onMouseDown={handleMouseDown}>
-      <canvas ref={thumbRef} width={MINIMAP_W} height={MINIMAP_H} />
-      <div
-        className="minimap-viewport"
-        style={{
-          left: viewport.x,
-          top: viewport.y,
-          width: viewport.w,
-          height: viewport.h,
-        }}
-      />
+    <div className="minimap">
+      <div className="minimap-thumb" onMouseDown={handleMouseDown}>
+        <canvas ref={thumbRef} width={MINIMAP_W} height={THUMB_H} />
+        <div
+          className="minimap-viewport"
+          style={{
+            left: viewport.x,
+            top: viewport.y,
+            width: viewport.w,
+            height: viewport.h,
+          }}
+        />
+      </div>
+      <div className="minimap-info">
+        <div className="minimap-info-row">
+          <span className="minimap-info-label">문서 크기</span>
+          <span className="minimap-info-value">{docWidth} x {docHeight} px</span>
+        </div>
+        <div className="minimap-info-row">
+          <span className="minimap-info-label">뷰포트</span>
+          <span className="minimap-info-value">{viewportPx.w} x {viewportPx.h} px</span>
+        </div>
+        <div className="minimap-info-row">
+          <span className="minimap-info-label">커서 위치</span>
+          <span className="minimap-info-value">X: {cursorX}, Y: {cursorY}</span>
+        </div>
+      </div>
     </div>
   );
 };

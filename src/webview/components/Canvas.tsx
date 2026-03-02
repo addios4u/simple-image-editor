@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo, useCallback, useState } from 'react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ZoomControls from './ZoomControls';
 import Minimap from './Minimap';
@@ -46,6 +46,7 @@ const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   const tool = useMemo(() => {
     if (!toolRef.current || toolRef.current.type !== activeTool) {
@@ -64,7 +65,9 @@ const Canvas: React.FC = () => {
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      tool.onPointerMove(toToolEvent(e));
+      const evt = toToolEvent(e);
+      tool.onPointerMove(evt);
+      setCursorPos({ x: Math.round(evt.x), y: Math.round(evt.y) });
     },
     [tool],
   );
@@ -105,6 +108,10 @@ const Canvas: React.FC = () => {
         panX={panX}
         panY={panY}
         setPan={setPan}
+        docWidth={canvasWidth}
+        docHeight={canvasHeight}
+        cursorX={cursorPos.x}
+        cursorY={cursorPos.y}
       />
     </div>
   );

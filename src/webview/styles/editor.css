@@ -170,15 +170,23 @@ canvas {
   top: 0;
   right: 0;
   width: 200px;
-  height: 120px;
   background: #1a1a1a;
   overflow: hidden;
-  cursor: crosshair;
   z-index: 10;
   user-select: none;
+  display: flex;
+  flex-direction: column;
 }
 
-.minimap canvas {
+.minimap-thumb {
+  position: relative;
+  width: 200px;
+  height: 120px;
+  cursor: crosshair;
+  flex-shrink: 0;
+}
+
+.minimap-thumb canvas {
   display: block;
   image-rendering: auto;
   cursor: inherit;
@@ -189,6 +197,30 @@ canvas {
   border: 1.5px solid var(--accent);
   pointer-events: none;
   box-sizing: border-box;
+}
+
+.minimap-info {
+  background: var(--bg-primary);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.minimap-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.minimap-info-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.minimap-info-value {
+  font-size: 10px;
+  color: var(--text-primary);
 }
 
 /* Checkerboard background for transparency */
