@@ -77,23 +77,25 @@ const Canvas: React.FC = () => {
   );
 
   return (
-    <div className="canvas-container" ref={containerRef}>
-      <div
-        className="canvas-wrapper"
-        style={{
-          transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          data-testid="editor-canvas"
-          width={canvasWidth}
-          height={canvasHeight}
-          style={{ cursor: tool.getCursor() }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-        />
+    <div className="canvas-area-wrapper" ref={containerRef}>
+      <div className="canvas-container">
+        <div
+          className="canvas-wrapper"
+          style={{
+            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            data-testid="editor-canvas"
+            width={canvasWidth}
+            height={canvasHeight}
+            style={{ cursor: tool.getCursor() }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          />
+        </div>
       </div>
       <Minimap
         mode="transform"

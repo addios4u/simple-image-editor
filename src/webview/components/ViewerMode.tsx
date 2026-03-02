@@ -140,20 +140,22 @@ const ViewerMode: React.FC = () => {
         <ModeSegment />
       </div>
       <div className="toolbar-divider" />
-      <div
-        ref={areaRef}
-        className="editor-canvas-area"
-        style={{ cursor: grabbing ? 'grabbing' : 'grab' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
+      <div className="canvas-area-wrapper">
         <div
-          className="canvas-container"
-          style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+          ref={areaRef}
+          className="editor-canvas-area"
+          style={{ cursor: grabbing ? 'grabbing' : 'grab' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         >
-          <canvas ref={canvasRef} data-testid="viewer-canvas" />
+          <div
+            className="canvas-container"
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+          >
+            <canvas ref={canvasRef} data-testid="viewer-canvas" />
+          </div>
         </div>
         <Minimap
           mode="scroll"
