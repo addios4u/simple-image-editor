@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { useEditorStore } from '../state/editorStore';
-import ZoomControls from './ZoomControls';
+import ModeSegment from './ModeSegment';
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -17,11 +18,14 @@ const ViewerMode: React.FC = () => {
   const scrollStart = useRef({ x: 0, y: 0 });
 
   const zoom = useEditorStore((s) => s.zoom);
+  const setZoom = useEditorStore((s) => s.setZoom);
   const imageData = useEditorStore((s) => s.imageData);
+  const fileName = useEditorStore((s) => s.fileName);
+  const canvasWidth = useEditorStore((s) => s.canvasWidth);
+  const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const fillColor = useEditorStore((s) => s.fillColor);
   const setFillColor = useEditorStore((s) => s.setFillColor);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
-  const setMode = useEditorStore((s) => s.setMode);
 
   const [grabbing, setGrabbing] = useState(false);
   const [copied, setCopied] = useState('');
@@ -48,7 +52,7 @@ const ViewerMode: React.FC = () => {
     img.src = url;
   }, [imageData, setCanvasSize]);
 
-  // Drag-to-pan handlers
+  // Drag-to-pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const area = areaRef.current;
@@ -64,10 +68,8 @@ const ViewerMode: React.FC = () => {
     if (!isDragging.current) return;
     const area = areaRef.current;
     if (!area) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    area.scrollLeft = scrollStart.current.x - dx;
-    area.scrollTop = scrollStart.current.y - dy;
+    area.scrollLeft = scrollStart.current.x - (e.clientX - dragStart.current.x);
+    area.scrollTop = scrollStart.current.y - (e.clientY - dragStart.current.y);
   }, []);
 
   const handleMouseUp = useCallback(() => {
@@ -75,82 +77,66 @@ const ViewerMode: React.FC = () => {
     setGrabbing(false);
   }, []);
 
-  // Eyedropper color picker
+  // Eyedropper
   const pickColor = useCallback(async () => {
     if (!('EyeDropper' in window)) return;
     const EyeDropper = (window as any).EyeDropper;
-    const dropper = new EyeDropper();
     try {
-      const result = await dropper.open();
+      const result = await new EyeDropper().open();
       setFillColor(result.sRGBHex);
-    } catch {
-      // User cancelled
-    }
+    } catch { /* cancelled */ }
   }, [setFillColor]);
 
-  // Copy color value to clipboard
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(text);
     setTimeout(() => setCopied(''), 1500);
   }, []);
 
+  const zoomIn = () => setZoom(Math.min(zoom * 1.25, 32));
+  const zoomOut = () => setZoom(Math.max(zoom / 1.25, 0.01));
+
   return (
-    <div
-      ref={areaRef}
-      className="editor-canvas-area"
-      style={{ cursor: grabbing ? 'grabbing' : 'grab' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      <div
-        className="canvas-container"
-        style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-      >
-        <canvas
-          ref={canvasRef}
-          data-testid="viewer-canvas"
-        />
-      </div>
-      <div className="viewer-toolbar" onMouseDown={(e) => e.stopPropagation()}>
-        <ZoomControls />
-        <div className="toolbar-separator" />
-        <div className="color-picker-group">
-          <button
-            className="color-swatch-btn"
-            style={{ background: fillColor }}
-            onClick={pickColor}
-            title="Pick Color (Eyedropper)"
-          />
-          <div className="color-info">
-            <span
-              className={`color-hex${copied === fillColor.toUpperCase() ? ' copied' : ''}`}
-              onClick={() => copyToClipboard(fillColor.toUpperCase())}
-              title="Click to copy HEX"
-            >
-              {copied === fillColor.toUpperCase() ? 'Copied!' : fillColor.toUpperCase()}
-            </span>
-            <span
-              className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
-              onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
-              title="Click to copy RGB"
-            >
-              {copied === `rgb(${hexToRgb(fillColor)})` ? 'Copied!' : `RGB(${hexToRgb(fillColor)})`}
-            </span>
-          </div>
-        </div>
+    <>
+      <div className="editor-toolbar">
+        <button className="toolbar-btn" onClick={zoomOut} title="Zoom Out">
+          <Minus size={14} />
+        </button>
+        <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+        <button className="toolbar-btn" onClick={zoomIn} title="Zoom In">
+          <Plus size={14} />
+        </button>
         <div className="toolbar-separator" />
         <button
-          className="toolbar-btn"
-          onClick={() => setMode('editor')}
-          title="Edit Mode"
-        >
-          Edit
-        </button>
+          className="color-swatch-btn"
+          style={{ background: fillColor }}
+          onClick={pickColor}
+          title="Pick Color (Eyedropper)"
+        />
+        <span className="toolbar-file-label">
+          {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
+        </span>
+        <div className="toolbar-spacer" />
+        <ModeSegment />
       </div>
-    </div>
+      <div className="toolbar-divider" />
+      <div
+        ref={areaRef}
+        className="editor-canvas-area"
+        style={{ cursor: grabbing ? 'grabbing' : 'grab' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <div
+          className="canvas-container"
+          style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+        >
+          <canvas ref={canvasRef} data-testid="viewer-canvas" />
+        </div>
+      </div>
+    </>
   );
 };
 
