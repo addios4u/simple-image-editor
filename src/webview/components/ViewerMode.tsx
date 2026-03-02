@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useEditorStore } from '../state/editorStore';
+import ZoomControls from './ZoomControls';
 
 const ViewerMode: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -7,6 +8,10 @@ const ViewerMode: React.FC = () => {
   const panX = useEditorStore((s) => s.panX);
   const panY = useEditorStore((s) => s.panY);
   const imageData = useEditorStore((s) => s.imageData);
+  const fillColor = useEditorStore((s) => s.fillColor);
+  const strokeColor = useEditorStore((s) => s.strokeColor);
+  const setFillColor = useEditorStore((s) => s.setFillColor);
+  const setStrokeColor = useEditorStore((s) => s.setStrokeColor);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
   const setMode = useEditorStore((s) => s.setMode);
 
@@ -44,13 +49,36 @@ const ViewerMode: React.FC = () => {
           data-testid="viewer-canvas"
         />
       </div>
-      <button
-        className="toolbar-btn"
-        style={{ position: 'absolute', top: 8, right: 8 }}
-        onClick={() => setMode('editor')}
-      >
-        Edit
-      </button>
+      <div className="viewer-toolbar">
+        <ZoomControls />
+        <div className="toolbar-separator" />
+        <span className="color-label">Fill</span>
+        <div className="color-swatch" style={{ background: fillColor }}>
+          <input
+            type="color"
+            value={fillColor}
+            onChange={(e) => setFillColor(e.target.value)}
+            title="Fill Color"
+          />
+        </div>
+        <span className="color-label">Stroke</span>
+        <div className="color-swatch" style={{ background: strokeColor }}>
+          <input
+            type="color"
+            value={strokeColor}
+            onChange={(e) => setStrokeColor(e.target.value)}
+            title="Stroke Color"
+          />
+        </div>
+        <div className="toolbar-separator" />
+        <button
+          className="toolbar-btn"
+          onClick={() => setMode('editor')}
+          title="Edit Mode (E)"
+        >
+          Edit
+        </button>
+      </div>
     </div>
   );
 };

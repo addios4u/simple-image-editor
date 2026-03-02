@@ -3,6 +3,7 @@ import { useEditorStore } from './state/editorStore';
 import ViewerMode from './components/ViewerMode';
 import EditorMode from './components/EditorMode';
 import vscodeApi from './vscode';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 interface InitMessage {
     type: 'init';
     body: { data: number[]; fileName: string; isUntitled: boolean };
@@ -11,6 +12,8 @@ interface InitMessage {
 const App: React.FC = () => {
     const mode = useEditorStore((s) => s.mode);
     const setImageData = useEditorStore((s) => s.setImageData);
+
+    useKeyboardShortcuts();
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
