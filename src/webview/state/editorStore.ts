@@ -15,6 +15,8 @@ interface EditorState {
   canvasWidth: number;
   canvasHeight: number;
   activeTab: SidebarTab;
+  imageData: Uint8Array | null;
+  fileName: string;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -24,6 +26,7 @@ interface EditorState {
   setStrokeColor: (color: string) => void;
   setCanvasSize: (w: number, h: number) => void;
   setActiveTab: (tab: SidebarTab) => void;
+  setImageData: (data: Uint8Array, fileName: string) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -37,6 +40,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   canvasWidth: 800,
   canvasHeight: 600,
   activeTab: 'layers',
+  imageData: null,
+  fileName: '',
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -45,4 +50,5 @@ export const useEditorStore = create<EditorState>((set) => ({
   setStrokeColor: (color) => set({ strokeColor: color }),
   setCanvasSize: (w, h) => set({ canvasWidth: w, canvasHeight: h }),
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setImageData: (data, fileName) => set({ imageData: data, fileName }),
 }));
