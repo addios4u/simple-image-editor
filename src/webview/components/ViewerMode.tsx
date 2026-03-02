@@ -162,9 +162,16 @@ const ViewerMode: React.FC = () => {
         >
           <div
             className="canvas-container"
-            style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+            style={{
+              width: canvasWidth * zoom,
+              height: canvasHeight * zoom,
+            }}
           >
-            <canvas ref={canvasRef} data-testid="viewer-canvas" />
+            <canvas
+              ref={canvasRef}
+              data-testid="viewer-canvas"
+              style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+            />
           </div>
         </div>
         <Minimap
