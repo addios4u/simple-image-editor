@@ -133,7 +133,7 @@ body {
 canvas {
   display: block;
   image-rendering: pixelated;
-  cursor: crosshair;
+  cursor: inherit;
 }
 
 /* Checkerboard background for transparency */
