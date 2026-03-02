@@ -120,17 +120,18 @@ const ViewerMode: React.FC = () => {
               onClick={() => copyToClipboard(fillColor)}
               title="Copy HEX"
             >
-              {fillColor}
+              {copied === fillColor ? 'Copied!' : fillColor}
             </span>
             <span
               className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
               onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
               title="Copy RGB"
             >
-              rgb({hexToRgb(fillColor)})
+              {copied === `rgb(${hexToRgb(fillColor)})` ? 'Copied!' : `rgb(${hexToRgb(fillColor)})`}
             </span>
           </div>
         </div>
+        <div className="toolbar-separator" />
         <span className="toolbar-file-label">
           {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
         </span>
