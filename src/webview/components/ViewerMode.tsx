@@ -26,6 +26,7 @@ function getMimeType(fileName: string): string {
 
 const ViewerMode: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -41,13 +42,15 @@ const ViewerMode: React.FC = () => {
   const setFillColor = useEditorStore((s) => s.setFillColor);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
 
+  const isSvg = fileName.toLowerCase().endsWith('.svg');
+  const [svgUrl, setSvgUrl] = useState<string | null>(null);
   const [grabbing, setGrabbing] = useState(false);
   const [copied, setCopied] = useState('');
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
-  // Draw image on canvas
+  // Draw image on canvas (raster) or prepare SVG URL
   useEffect(() => {
-    if (!imageData || !canvasRef.current) return;
+    if (!imageData) return;
 
     const mime = getMimeType(fileName);
     const blob = new Blob([imageData.buffer as ArrayBuffer], { type: mime });
@@ -63,10 +66,17 @@ const ViewerMode: React.FC = () => {
       if (ctx) {
         ctx.drawImage(img, 0, 0);
       }
-      URL.revokeObjectURL(url);
+      if (isSvg) {
+        setSvgUrl(url);
+      } else {
+        URL.revokeObjectURL(url);
+      }
     };
     img.src = url;
-  }, [imageData, fileName, setCanvasSize]);
+    return () => {
+      if (isSvg) URL.revokeObjectURL(url);
+    };
+  }, [imageData, fileName, isSvg, setCanvasSize]);
 
   // Drag-to-pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -82,9 +92,9 @@ const ViewerMode: React.FC = () => {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Track cursor position in image coordinates
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
+    const el = isSvg ? imgRef.current : canvasRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
       const imgX = Math.round((e.clientX - rect.left) / zoom);
       const imgY = Math.round((e.clientY - rect.top) / zoom);
       setCursorPos({ x: Math.max(0, imgX), y: Math.max(0, imgY) });
@@ -95,7 +105,7 @@ const ViewerMode: React.FC = () => {
     if (!area) return;
     area.scrollLeft = scrollStart.current.x - (e.clientX - dragStart.current.x);
     area.scrollTop = scrollStart.current.y - (e.clientY - dragStart.current.y);
-  }, [zoom]);
+  }, [zoom, isSvg]);
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -184,8 +194,19 @@ const ViewerMode: React.FC = () => {
             <canvas
               ref={canvasRef}
               data-testid="viewer-canvas"
-              style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+              style={isSvg
+                ? { display: 'none' }
+                : { transform: `scale(${zoom})`, transformOrigin: '0 0' }
+              }
             />
+            {isSvg && svgUrl && (
+              <img
+                ref={imgRef}
+                src={svgUrl}
+                alt={fileName}
+                style={{ width: '100%', height: '100%' }}
+              />
+            )}
           </div>
         </div>
         <Minimap

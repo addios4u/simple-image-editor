@@ -5,6 +5,10 @@ import { useEditorStore, type EditorMode } from '../state/editorStore';
 const ModeSegment: React.FC = () => {
   const mode = useEditorStore((s) => s.mode);
   const setMode = useEditorStore((s) => s.setMode);
+  const fileName = useEditorStore((s) => s.fileName);
+
+  const isSvg = fileName.toLowerCase().endsWith('.svg');
+  if (isSvg) return null;
 
   return (
     <div className="mode-segment">

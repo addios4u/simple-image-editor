@@ -11,7 +11,10 @@ interface InitMessage {
 
 const App: React.FC = () => {
     const mode = useEditorStore((s) => s.mode);
+    const fileName = useEditorStore((s) => s.fileName);
     const setImageData = useEditorStore((s) => s.setImageData);
+
+    const isSvg = fileName.toLowerCase().endsWith('.svg');
 
     useKeyboardShortcuts();
 
@@ -29,7 +32,7 @@ const App: React.FC = () => {
         return () => window.removeEventListener('message', handler);
     }, [setImageData]);
 
-    return mode === 'viewer' ? <ViewerMode /> : <EditorMode />;
+    return (mode === 'viewer' || isSvg) ? <ViewerMode /> : <EditorMode />;
 };
 
 export default App;
