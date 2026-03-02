@@ -260,16 +260,34 @@ canvas {
   line-height: 1;
 }
 
+.color-hex,
+.color-rgb {
+  font-family: monospace;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0 2px;
+  transition: background 0.1s, color 0.1s;
+}
+
 .color-hex {
   font-size: 11px;
-  font-family: monospace;
   color: var(--text-primary);
 }
 
 .color-rgb {
   font-size: 9px;
-  font-family: monospace;
   color: var(--text-secondary);
+}
+
+.color-hex:hover,
+.color-rgb:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.color-hex.copied,
+.color-rgb.copied {
+  color: #73c991;
 }
 
 /* Loading overlay */

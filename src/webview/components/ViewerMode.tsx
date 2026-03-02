@@ -19,13 +19,12 @@ const ViewerMode: React.FC = () => {
   const zoom = useEditorStore((s) => s.zoom);
   const imageData = useEditorStore((s) => s.imageData);
   const fillColor = useEditorStore((s) => s.fillColor);
-  const strokeColor = useEditorStore((s) => s.strokeColor);
   const setFillColor = useEditorStore((s) => s.setFillColor);
-  const setStrokeColor = useEditorStore((s) => s.setStrokeColor);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
   const setMode = useEditorStore((s) => s.setMode);
 
   const [grabbing, setGrabbing] = useState(false);
+  const [copied, setCopied] = useState('');
 
   // Draw image on canvas
   useEffect(() => {
@@ -77,21 +76,24 @@ const ViewerMode: React.FC = () => {
   }, []);
 
   // Eyedropper color picker
-  const pickColor = useCallback(async (target: 'fill' | 'stroke') => {
+  const pickColor = useCallback(async () => {
     if (!('EyeDropper' in window)) return;
     const EyeDropper = (window as any).EyeDropper;
     const dropper = new EyeDropper();
     try {
       const result = await dropper.open();
-      if (target === 'fill') {
-        setFillColor(result.sRGBHex);
-      } else {
-        setStrokeColor(result.sRGBHex);
-      }
+      setFillColor(result.sRGBHex);
     } catch {
       // User cancelled
     }
-  }, [setFillColor, setStrokeColor]);
+  }, [setFillColor]);
+
+  // Copy color value to clipboard
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(text);
+    setTimeout(() => setCopied(''), 1500);
+  }, []);
 
   return (
     <div
@@ -119,24 +121,24 @@ const ViewerMode: React.FC = () => {
           <button
             className="color-swatch-btn"
             style={{ background: fillColor }}
-            onClick={() => pickColor('fill')}
-            title="Pick Fill Color (Eyedropper)"
+            onClick={pickColor}
+            title="Pick Color (Eyedropper)"
           />
           <div className="color-info">
-            <span className="color-hex">{fillColor.toUpperCase()}</span>
-            <span className="color-rgb">RGB({hexToRgb(fillColor)})</span>
-          </div>
-        </div>
-        <div className="color-picker-group">
-          <button
-            className="color-swatch-btn"
-            style={{ background: strokeColor }}
-            onClick={() => pickColor('stroke')}
-            title="Pick Stroke Color (Eyedropper)"
-          />
-          <div className="color-info">
-            <span className="color-hex">{strokeColor.toUpperCase()}</span>
-            <span className="color-rgb">RGB({hexToRgb(strokeColor)})</span>
+            <span
+              className={`color-hex${copied === fillColor.toUpperCase() ? ' copied' : ''}`}
+              onClick={() => copyToClipboard(fillColor.toUpperCase())}
+              title="Click to copy HEX"
+            >
+              {copied === fillColor.toUpperCase() ? 'Copied!' : fillColor.toUpperCase()}
+            </span>
+            <span
+              className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
+              onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
+              title="Click to copy RGB"
+            >
+              {copied === `rgb(${hexToRgb(fillColor)})` ? 'Copied!' : `RGB(${hexToRgb(fillColor)})`}
+            </span>
           </div>
         </div>
         <div className="toolbar-separator" />
