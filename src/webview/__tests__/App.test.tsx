@@ -88,7 +88,7 @@ describe('App', () => {
       expect(mockInitEngine).toHaveBeenCalledTimes(1);
       expect(mockLoadImage).toHaveBeenCalledWith(
         expect.any(Uint8Array),
-        'background',
+        'layer-1',
       );
       expect(mockRequestRender).toHaveBeenCalledTimes(1);
 

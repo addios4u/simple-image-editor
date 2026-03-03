@@ -5,17 +5,29 @@ import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { SelectionTool } from '../tools/SelectionTool';
 import { MarqueeTool } from '../tools/MarqueeTool';
-import { BrushTool } from '../tools/BrushTool';
+import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
-import { setupCanvas, setupRenderLoop, compositeAndRender } from '../engine/engineContext';
+import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
+import { hexToPackedRGBA } from '../engine/helpers';
+import { useLayerStore } from '../state/layerStore';
+
+/** Lazy config — getters read current store state on each call. */
+const brushConfig: BrushToolConfig = {
+  getColor: () => hexToPackedRGBA(useEditorStore.getState().fillColor),
+  getSize: () => useEditorStore.getState().strokeWidth,
+  getHardness: () => 1.0,
+  getActiveLayerId: () => useLayerStore.getState().activeLayerId,
+  brushStrokeLayer,
+  requestRender,
+};
 
 function createTool(type: ToolType): BaseTool {
   switch (type) {
     case 'marquee':
       return new MarqueeTool();
     case 'brush':
-      return new BrushTool();
+      return new BrushTool(brushConfig);
     case 'text':
       return new TextTool();
     case 'select':

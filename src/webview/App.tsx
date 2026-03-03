@@ -40,7 +40,7 @@ const App: React.FC = () => {
                 if (!fName.toLowerCase().endsWith('.svg')) {
                     try {
                         await initEngine(loadWasmModule);
-                        const { width, height } = loadImage(imageBytes, 'background');
+                        const { width, height } = loadImage(imageBytes, 'layer-1');
                         setCanvasSize(width, height);
                         requestRender();
                     } catch (err) {

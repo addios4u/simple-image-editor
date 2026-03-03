@@ -17,6 +17,7 @@ interface EditorState {
   activeTab: SidebarTab;
   imageData: Uint8Array | null;
   fileName: string;
+  strokeWidth: number;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -27,6 +28,7 @@ interface EditorState {
   setCanvasSize: (w: number, h: number) => void;
   setActiveTab: (tab: SidebarTab) => void;
   setImageData: (data: Uint8Array, fileName: string) => void;
+  setStrokeWidth: (width: number) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -42,6 +44,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   activeTab: 'layers',
   imageData: null,
   fileName: '',
+  strokeWidth: 5,
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -51,4 +54,5 @@ export const useEditorStore = create<EditorState>((set) => ({
   setCanvasSize: (w, h) => set({ canvasWidth: w, canvasHeight: h }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   setImageData: (data, fileName) => set({ imageData: data, fileName }),
+  setStrokeWidth: (width) => set({ strokeWidth: width }),
 }));

@@ -12,6 +12,12 @@ vi.mock('../../engine/engineContext', () => ({
   setupCanvas: (...args: unknown[]) => mockSetupCanvas(...args),
   setupRenderLoop: (...args: unknown[]) => mockSetupRenderLoop(...args),
   compositeAndRender: (...args: unknown[]) => mockCompositeAndRender(...args),
+  brushStrokeLayer: vi.fn(),
+  requestRender: vi.fn(),
+}));
+
+vi.mock('../../engine/helpers', () => ({
+  hexToPackedRGBA: vi.fn(() => 0x000000FF),
 }));
 
 const mockLoopStart = vi.fn();
