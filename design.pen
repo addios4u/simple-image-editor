@@ -873,6 +873,35 @@
                                   "fontWeight": "normal"
                                 }
                               ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "tIuHF",
+                              "name": "l3Actions",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "UjHIP",
+                                  "name": "l3Unlock",
+                                  "width": 12,
+                                  "height": 12,
+                                  "iconFontName": "lock-open",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#969696"
+                                },
+                                {
+                                  "type": "icon_font",
+                                  "id": "iATOE",
+                                  "name": "l3Trash",
+                                  "width": 14,
+                                  "height": 14,
+                                  "iconFontName": "trash-2",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#969696"
+                                }
+                              ]
                             }
                           ]
                         },
@@ -945,6 +974,35 @@
                                   "fontFamily": "Inter",
                                   "fontSize": 10,
                                   "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "7bB3Z",
+                              "name": "l2Actions",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "jpaMM",
+                                  "name": "l2Unlock",
+                                  "width": 12,
+                                  "height": 12,
+                                  "iconFontName": "lock-open",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#969696"
+                                },
+                                {
+                                  "type": "icon_font",
+                                  "id": "GzakK",
+                                  "name": "l2Trash",
+                                  "width": 14,
+                                  "height": 14,
+                                  "iconFontName": "trash-2",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#969696"
                                 }
                               ]
                             }
@@ -1029,14 +1087,33 @@
                               ]
                             },
                             {
-                              "type": "icon_font",
-                              "id": "57PuI",
-                              "name": "lBgLock",
-                              "width": 12,
-                              "height": 12,
-                              "iconFontName": "lock",
-                              "iconFontFamily": "lucide",
-                              "fill": "#969696"
+                              "type": "frame",
+                              "id": "yRXsv",
+                              "name": "bgActions",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon_font",
+                                  "id": "upEx5",
+                                  "name": "bgLock",
+                                  "width": 12,
+                                  "height": 12,
+                                  "iconFontName": "lock",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#969696"
+                                },
+                                {
+                                  "type": "icon_font",
+                                  "id": "vSq0L",
+                                  "name": "bgTrash",
+                                  "width": 14,
+                                  "height": 14,
+                                  "iconFontName": "trash-2",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "#555555"
+                                }
+                              ]
                             }
                           ]
                         }
@@ -1059,7 +1136,6 @@
                   "width": "fill_container",
                   "height": 36,
                   "fill": "#252526",
-                  "gap": 8,
                   "padding": [
                     0,
                     8
@@ -1069,45 +1145,39 @@
                   "children": [
                     {
                       "type": "frame",
-                      "id": "6CLAR",
-                      "name": "addBtn",
-                      "width": 28,
+                      "id": "7kzD3",
+                      "name": "addLayerBtn",
+                      "width": "fill_container",
                       "height": 28,
+                      "fill": "transparent",
                       "cornerRadius": 4,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#555555"
+                      },
+                      "gap": 6,
                       "justifyContent": "center",
                       "alignItems": "center",
                       "children": [
                         {
                           "type": "icon_font",
-                          "id": "ZVc2w",
+                          "id": "LGRjG",
                           "name": "addIcon",
-                          "width": 16,
-                          "height": 16,
+                          "width": 14,
+                          "height": 14,
                           "iconFontName": "plus",
                           "iconFontFamily": "lucide",
-                          "fill": "#cccccc"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "Bf56b",
-                      "name": "removeBtn",
-                      "width": 28,
-                      "height": 28,
-                      "cornerRadius": 4,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
+                          "fill": "#969696"
+                        },
                         {
-                          "type": "icon_font",
-                          "id": "dQYr0",
-                          "name": "removeIcon",
-                          "width": 16,
-                          "height": 16,
-                          "iconFontName": "minus",
-                          "iconFontFamily": "lucide",
-                          "fill": "#cccccc"
+                          "type": "text",
+                          "id": "ZnLsZ",
+                          "name": "addLabel",
+                          "fill": "#969696",
+                          "content": "레이어 추가",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     }

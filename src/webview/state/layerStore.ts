@@ -5,6 +5,7 @@ export interface Layer {
   name: string;
   visible: boolean;
   opacity: number;
+  locked: boolean;
 }
 
 interface LayerState {
@@ -15,6 +16,7 @@ interface LayerState {
   removeLayer: (id: string) => void;
   setLayerVisibility: (id: string, visible: boolean) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
+  setLayerLocked: (id: string, locked: boolean) => void;
   setActiveLayer: (id: string) => void;
   reorderLayers: (layerIds: string[]) => void;
   duplicateLayer: (id: string) => void;
@@ -28,14 +30,14 @@ interface LayerState {
 let nextId = 2;
 
 export const useLayerStore = create<LayerState>((set, get) => ({
-  layers: [{ id: 'layer-1', name: 'Background', visible: true, opacity: 1 }],
+  layers: [{ id: 'layer-1', name: 'Background', visible: true, opacity: 1, locked: false }],
   activeLayerId: 'layer-1',
 
   addLayer: () =>
     set((state) => {
       const id = `layer-${nextId++}`;
       const name = `Layer ${nextId - 1}`;
-      const newLayer: Layer = { id, name, visible: true, opacity: 1 };
+      const newLayer: Layer = { id, name, visible: true, opacity: 1, locked: false };
       return { layers: [...state.layers, newLayer] };
     }),
 
@@ -59,6 +61,13 @@ export const useLayerStore = create<LayerState>((set, get) => ({
     set((state) => ({
       layers: state.layers.map((l) =>
         l.id === id ? { ...l, opacity: Math.max(0, Math.min(1, opacity)) } : l,
+      ),
+    })),
+
+  setLayerLocked: (id, locked) =>
+    set((state) => ({
+      layers: state.layers.map((l) =>
+        l.id === id ? { ...l, locked } : l,
       ),
     })),
 

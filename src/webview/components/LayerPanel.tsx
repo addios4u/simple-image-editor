@@ -67,6 +67,7 @@ const LayerPanel: React.FC = () => {
   const setActiveLayer = useLayerStore((s) => s.setActiveLayer);
   const setLayerVisibility = useLayerStore((s) => s.setLayerVisibility);
   const setLayerOpacity = useLayerStore((s) => s.setLayerOpacity);
+  const setLayerLocked = useLayerStore((s) => s.setLayerLocked);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
   const activeOpacity = activeLayer ? Math.round(activeLayer.opacity * 100) : 100;
@@ -112,7 +113,6 @@ const LayerPanel: React.FC = () => {
       <div className="layer-list" data-testid="layer-list">
         {[...layers].reverse().map((layer) => {
           const isActive = layer.id === activeLayerId;
-          const isBackground = layer.id === layers[0]?.id;
           return (
             <div
               key={layer.id}
@@ -143,9 +143,18 @@ const LayerPanel: React.FC = () => {
                 </span>
               </div>
               <div className="layer-item-actions">
-                {isBackground
-                  ? <Lock size={12} color="#969696" />
-                  : <LockOpen size={12} color="#969696" />}
+                <button
+                  className="layer-lock-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLayerLocked(layer.id, !layer.locked);
+                  }}
+                  aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                >
+                  {layer.locked
+                    ? <Lock size={12} color="#969696" />
+                    : <LockOpen size={12} color="#969696" />}
+                </button>
                 <button
                   className="layer-delete-btn"
                   data-testid={`delete-layer-${layer.id}`}
@@ -156,7 +165,7 @@ const LayerPanel: React.FC = () => {
                   disabled={layers.length <= 1}
                   aria-label={`Delete ${layer.name}`}
                 >
-                  <Trash2 size={14} color={isBackground && layers.length > 1 ? '#555555' : '#969696'} />
+                  <Trash2 size={14} color="#969696" />
                 </button>
               </div>
             </div>
