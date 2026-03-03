@@ -1,84 +1,22 @@
 import { BaseTool, type PointerEvent, type Point } from './BaseTool';
-import type { SelectionShape } from '../state/editorStore';
+import type { SelectionRect, SelectionShape } from '../state/editorStore';
+import { SelectionMask } from '../engine/selectionMask';
+import { extractContour } from '../engine/marchingSquares';
 
-export interface SelectionRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type { SelectionRect };
 
 export interface MarqueeToolConfig {
+  /** Update the store's bounding-rect selection (backward compat). */
   setSelection: (rect: SelectionRect | null) => void;
-  getSelection: () => SelectionRect | null;
   getSelectionShape: () => SelectionShape;
+  getCanvasSize: () => { width: number; height: number };
+  /** Get the current selection mask (global singleton). */
+  getMask: () => SelectionMask | null;
+  /** Push updated contour for marching-ants rendering. */
+  onContourChange: (contour: Array<Array<[number, number]>> | null) => void;
 }
 
-type SelectionMode = 'replace' | 'add' | 'subtract';
-
-/** Compute bounding box union of two rects. */
-function unionBounds(a: SelectionRect, b: SelectionRect): SelectionRect {
-  const x = Math.min(a.x, b.x);
-  const y = Math.min(a.y, b.y);
-  const right = Math.max(a.x + a.width, b.x + b.width);
-  const bottom = Math.max(a.y + a.height, b.y + b.height);
-  return { x, y, width: right - x, height: bottom - y };
-}
-
-/**
- * Subtract `sub` from `base`. Returns the largest remaining rectangle,
- * or null if `base` is fully covered.
- */
-function subtractRect(base: SelectionRect, sub: SelectionRect): SelectionRect | null {
-  const bRight = base.x + base.width;
-  const bBottom = base.y + base.height;
-  const sRight = sub.x + sub.width;
-  const sBottom = sub.y + sub.height;
-
-  // No overlap → keep base
-  if (sub.x >= bRight || sRight <= base.x || sub.y >= bBottom || sBottom <= base.y) {
-    return base;
-  }
-
-  // Fully covered → null
-  if (sub.x <= base.x && sRight >= bRight && sub.y <= base.y && sBottom >= bBottom) {
-    return null;
-  }
-
-  // Compute up to 4 remaining strips and pick the largest by area
-  const candidates: SelectionRect[] = [];
-
-  // Left strip
-  if (sub.x > base.x) {
-    candidates.push({ x: base.x, y: base.y, width: sub.x - base.x, height: base.height });
-  }
-  // Right strip
-  if (sRight < bRight) {
-    candidates.push({ x: sRight, y: base.y, width: bRight - sRight, height: base.height });
-  }
-  // Top strip
-  if (sub.y > base.y) {
-    candidates.push({ x: base.x, y: base.y, width: base.width, height: sub.y - base.y });
-  }
-  // Bottom strip
-  if (sBottom < bBottom) {
-    candidates.push({ x: base.x, y: sBottom, width: base.width, height: bBottom - sBottom });
-  }
-
-  if (candidates.length === 0) return null;
-
-  // Return the largest by area
-  let best = candidates[0];
-  let bestArea = best.width * best.height;
-  for (let i = 1; i < candidates.length; i++) {
-    const area = candidates[i].width * candidates[i].height;
-    if (area > bestArea) {
-      best = candidates[i];
-      bestArea = area;
-    }
-  }
-  return best;
-}
+type SelectionMode = 'replace' | 'add' | 'subtract' | 'intersect';
 
 export class MarqueeTool extends BaseTool {
   readonly name = 'marquee';
@@ -89,7 +27,7 @@ export class MarqueeTool extends BaseTool {
   private selectionRect: SelectionRect | null = null;
   private config: MarqueeToolConfig | undefined;
   private mode: SelectionMode = 'replace';
-  private prevSelection: SelectionRect | null = null;
+  private maskSnapshot: Uint8Array | null = null;
 
   constructor(config?: MarqueeToolConfig) {
     super();
@@ -102,7 +40,10 @@ export class MarqueeTool extends BaseTool {
 
   onPointerDown(e: PointerEvent): void {
     // Determine selection mode from modifier keys
-    if (e.shiftKey) {
+    // Priority: Shift+Alt → intersect, Shift → add, Alt → subtract
+    if (e.shiftKey && e.altKey) {
+      this.mode = 'intersect';
+    } else if (e.shiftKey) {
       this.mode = 'add';
     } else if (e.altKey) {
       this.mode = 'subtract';
@@ -110,8 +51,9 @@ export class MarqueeTool extends BaseTool {
       this.mode = 'replace';
     }
 
-    // Save previous selection for add/subtract
-    this.prevSelection = this.config?.getSelection() ?? null;
+    // Snapshot mask state for live preview restore
+    const mask = this.config?.getMask() ?? null;
+    this.maskSnapshot = mask ? mask.snapshot() : null;
 
     this.isSelecting = true;
     this.startPoint = { x: e.x, y: e.y };
@@ -121,24 +63,15 @@ export class MarqueeTool extends BaseTool {
   onPointerMove(e: PointerEvent): void {
     if (!this.isSelecting || !this.startPoint) return;
     this.updateRect(e);
-
-    // Live preview: show combined result during drag
-    if (this.config) {
-      const combined = this.combineSelection(this.selectionRect!);
-      this.config.setSelection(combined);
-    }
+    this.applyToMask();
   }
 
   onPointerUp(e: PointerEvent): void {
     if (!this.isSelecting || !this.startPoint) return;
     this.updateRect(e);
     this.isSelecting = false;
-
-    if (this.config) {
-      const combined = this.combineSelection(this.selectionRect!);
-      this.config.setSelection(combined);
-      this.selectionRect = combined;
-    }
+    this.applyToMask();
+    this.maskSnapshot = null;
   }
 
   getSelectionRect(): SelectionRect | null {
@@ -146,12 +79,93 @@ export class MarqueeTool extends BaseTool {
   }
 
   reset(): void {
+    // If we have a snapshot (mid-drag), restore it
+    if (this.maskSnapshot) {
+      const mask = this.config?.getMask() ?? null;
+      if (mask) {
+        mask.restore(this.maskSnapshot);
+      }
+    }
     this.isSelecting = false;
     this.startPoint = null;
     this.selectionRect = null;
-    this.prevSelection = null;
+    this.maskSnapshot = null;
     this.mode = 'replace';
-    this.config?.setSelection(null);
+    if (this.config) {
+      const mask = this.config.getMask();
+      if (mask) {
+        mask.clear();
+        this.config.onContourChange(null);
+      }
+      this.config.setSelection(null);
+    }
+  }
+
+  /**
+   * Apply the current drag rect onto the mask using the active mode,
+   * then update store bounds and contour.
+   */
+  private applyToMask(): void {
+    if (!this.config || !this.selectionRect) return;
+
+    const mask = this.config.getMask();
+    if (!mask) {
+      // No mask available — fall back to simple rect
+      this.config.setSelection(this.selectionRect);
+      return;
+    }
+
+    const rect = this.selectionRect;
+    const shape = this.config.getSelectionShape();
+
+    // Restore from snapshot so each move re-applies from the base state
+    if (this.maskSnapshot) {
+      mask.restore(this.maskSnapshot);
+    }
+
+    // Apply the operation
+    switch (this.mode) {
+      case 'replace':
+        mask.clear();
+        if (shape === 'ellipse') {
+          mask.addEllipse(rect.x, rect.y, rect.width, rect.height);
+        } else {
+          mask.addRect(rect.x, rect.y, rect.width, rect.height);
+        }
+        break;
+      case 'add':
+        if (shape === 'ellipse') {
+          mask.addEllipse(rect.x, rect.y, rect.width, rect.height);
+        } else {
+          mask.addRect(rect.x, rect.y, rect.width, rect.height);
+        }
+        break;
+      case 'subtract':
+        if (shape === 'ellipse') {
+          mask.subtractEllipse(rect.x, rect.y, rect.width, rect.height);
+        } else {
+          mask.subtractRect(rect.x, rect.y, rect.width, rect.height);
+        }
+        break;
+      case 'intersect':
+        if (shape === 'ellipse') {
+          mask.intersectEllipse(rect.x, rect.y, rect.width, rect.height);
+        } else {
+          mask.intersectRect(rect.x, rect.y, rect.width, rect.height);
+        }
+        break;
+    }
+
+    // Update store with bounding rect
+    const bounds = mask.getBounds();
+    this.config.setSelection(bounds);
+    this.selectionRect = bounds;
+
+    // Update contour for rendering
+    const contour = mask.isEmpty()
+      ? null
+      : extractContour(mask.getMaskData(), mask.getWidth(), mask.getHeight());
+    this.config.onContourChange(contour);
   }
 
   private updateRect(e: PointerEvent): void {
@@ -168,19 +182,5 @@ export class MarqueeTool extends BaseTool {
       : this.startPoint.y - height;
 
     this.selectionRect = { x, y, width, height };
-  }
-
-  private combineSelection(newRect: SelectionRect): SelectionRect | null {
-    switch (this.mode) {
-      case 'add':
-        if (!this.prevSelection) return newRect;
-        return unionBounds(this.prevSelection, newRect);
-      case 'subtract':
-        if (!this.prevSelection) return null;
-        return subtractRect(this.prevSelection, newRect);
-      case 'replace':
-      default:
-        return newRect;
-    }
   }
 }
