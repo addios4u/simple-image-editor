@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ImageDocument } from './imageDocument';
 import { WebviewToExtMessage } from './protocol';
+import { createAIService } from './aiService';
 
 export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDocument> {
     public static readonly viewType = 'simpleImageEditor.imageEditor';
@@ -281,6 +282,41 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                 if (oraPending) {
                     this._pendingOraRequests.delete(oraReqId);
                     oraPending.resolve({ data: new Uint8Array(oraData), layerCount });
+                }
+                break;
+            }
+            case 'aiGenerate': {
+                const { prompt, provider: aiProvider, size } = message.body;
+                const service = createAIService(
+                    aiProvider as 'openai' | 'google',
+                    this._context.secrets,
+                );
+                service.generateImage(prompt, size).then(
+                    (imageData) => {
+                        panel.webview.postMessage({
+                            type: 'aiGenerateResult',
+                            body: { imageData },
+                        });
+                    },
+                    (err: Error) => {
+                        panel.webview.postMessage({
+                            type: 'aiGenerateResult',
+                            body: { error: err.message },
+                        });
+                    },
+                );
+                break;
+            }
+            case 'aiConfigureKey': {
+                const { provider: keyProvider, action, key } = message.body;
+                const service = createAIService(
+                    keyProvider as 'openai' | 'google',
+                    this._context.secrets,
+                );
+                if (action === 'save' && key) {
+                    service.setApiKey(key);
+                } else if (action === 'remove') {
+                    service.deleteApiKey();
                 }
                 break;
             }

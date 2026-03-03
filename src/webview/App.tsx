@@ -9,6 +9,7 @@ import { writeOra } from './engine/openraster';
 import { useLayerStore } from './state/layerStore';
 import { loadWasmModule } from './engine/loadWasm';
 import { useHistoryStore } from './state/historyStore';
+import { useAIStore } from './state/aiStore';
 
 interface InitMessage {
     type: 'init';
@@ -79,6 +80,17 @@ const App: React.FC = () => {
                         type: 'getFileDataResponse',
                         body: { requestId, data: [], error: String(err) },
                     });
+                }
+            }
+
+            if (message?.type === 'aiGenerateResult') {
+                const { imageData, error } = message.body;
+                const aiStore = useAIStore.getState();
+                aiStore.setGenerating(false);
+                if (error) {
+                    aiStore.setError(error);
+                } else if (imageData) {
+                    aiStore.setResult(imageData);
                 }
             }
 

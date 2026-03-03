@@ -67,6 +67,7 @@ vi.mock('../engine/loadWasm', () => ({
 
 import App from '../App';
 import { useEditorStore } from '../state/editorStore';
+import { useAIStore } from '../state/aiStore';
 
 function dispatchMessage(data: unknown): void {
   window.dispatchEvent(new MessageEvent('message', { data }));
@@ -243,6 +244,44 @@ describe('App', () => {
           layerCount: 1,
         },
       });
+    });
+  });
+
+  describe('aiGenerateResult message', () => {
+    beforeEach(() => {
+      useAIStore.setState({ isGenerating: true, result: null, error: null });
+    });
+
+    it('updates aiStore with result on success', async () => {
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({
+          type: 'aiGenerateResult',
+          body: { imageData: 'iVBORw0KGgoAAAANS' },
+        });
+      });
+
+      const state = useAIStore.getState();
+      expect(state.isGenerating).toBe(false);
+      expect(state.result).toBe('iVBORw0KGgoAAAANS');
+      expect(state.error).toBeNull();
+    });
+
+    it('updates aiStore with error on failure', async () => {
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({
+          type: 'aiGenerateResult',
+          body: { error: 'No API key configured for openai' },
+        });
+      });
+
+      const state = useAIStore.getState();
+      expect(state.isGenerating).toBe(false);
+      expect(state.result).toBeNull();
+      expect(state.error).toBe('No API key configured for openai');
     });
   });
 
