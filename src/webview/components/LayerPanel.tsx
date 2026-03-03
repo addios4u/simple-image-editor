@@ -75,8 +75,11 @@ const LayerPanel: React.FC = () => {
   const dragStartY = useRef(0);
 
   const handlePointerDown = useCallback((e: React.PointerEvent, layerId: string) => {
-    // Only left button, ignore buttons inside
+    // Only left button
     if (e.button !== 0) return;
+    // Ignore clicks on interactive elements (buttons, inputs) inside
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input')) return;
     dragStartY.current = e.clientY;
     setDraggedId(layerId);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
