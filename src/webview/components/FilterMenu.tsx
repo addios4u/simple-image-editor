@@ -1,4 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import {
+  gaussianBlurLayer,
+  boxBlurLayer,
+  motionBlurLayer,
+  captureLayerRegion,
+  requestRender,
+} from '../engine/engineContext';
+import { useHistoryStore } from '../state/historyStore';
+import { useLayerStore } from '../state/layerStore';
+import { useEditorStore } from '../state/editorStore';
 
 type FilterType = 'gaussian' | 'box' | 'motion' | null;
 
@@ -18,10 +28,46 @@ const FilterMenu: React.FC = () => {
     distance: '5',
   });
 
-  const handleApply = () => {
-    // Will connect to WASM filter functions in integration phase
+  const handleApply = useCallback(() => {
+    if (!activeFilter) return;
+
+    const { activeLayerId } = useLayerStore.getState();
+    const { canvasWidth: cw, canvasHeight: ch } = useEditorStore.getState();
+    const region = { x: 0, y: 0, w: cw, h: ch };
+
+    // Capture before snapshot for undo
+    const beforeSnapshot = captureLayerRegion(activeLayerId, 0, 0, cw, ch);
+
+    // Apply the filter
+    let label = '';
+    switch (activeFilter) {
+      case 'gaussian':
+        gaussianBlurLayer(activeLayerId, parseFloat(params.sigma));
+        label = 'Gaussian Blur';
+        break;
+      case 'box':
+        boxBlurLayer(activeLayerId, parseInt(params.radius, 10));
+        label = 'Box Blur';
+        break;
+      case 'motion':
+        motionBlurLayer(activeLayerId, parseInt(params.angle, 10), parseInt(params.distance, 10));
+        label = 'Motion Blur';
+        break;
+    }
+
+    // Capture after snapshot and record in history
+    if (beforeSnapshot) {
+      const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
+      const entryId = pushEditWithSnapshot(label, activeLayerId, beforeSnapshot, region);
+      const afterSnapshot = captureLayerRegion(activeLayerId, 0, 0, cw, ch);
+      if (afterSnapshot) {
+        commitSnapshot(entryId, afterSnapshot);
+      }
+    }
+
+    requestRender();
     setActiveFilter(null);
-  };
+  }, [activeFilter, params]);
 
   const handleCancel = () => {
     setActiveFilter(null);

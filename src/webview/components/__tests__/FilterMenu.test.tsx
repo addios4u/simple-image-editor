@@ -1,6 +1,54 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+
+// Mock engineContext filter functions
+const mockGaussianBlurLayer = vi.fn();
+const mockBoxBlurLayer = vi.fn();
+const mockMotionBlurLayer = vi.fn();
+const mockRequestRender = vi.fn();
+const mockCaptureLayerRegion = vi.fn(() => ({ free: vi.fn() }));
+
+vi.mock('../../engine/engineContext', () => ({
+  gaussianBlurLayer: (...args: unknown[]) => mockGaussianBlurLayer(...args),
+  boxBlurLayer: (...args: unknown[]) => mockBoxBlurLayer(...args),
+  motionBlurLayer: (...args: unknown[]) => mockMotionBlurLayer(...args),
+  requestRender: (...args: unknown[]) => mockRequestRender(...args),
+  captureLayerRegion: (...args: unknown[]) => mockCaptureLayerRegion(...args),
+}));
+
+// Mock historyStore
+const mockPushEditWithSnapshot = vi.fn(() => 'history-1');
+const mockCommitSnapshot = vi.fn();
+
+vi.mock('../../state/historyStore', () => ({
+  useHistoryStore: {
+    getState: () => ({
+      pushEditWithSnapshot: mockPushEditWithSnapshot,
+      commitSnapshot: mockCommitSnapshot,
+    }),
+  },
+}));
+
+// Mock layerStore
+vi.mock('../../state/layerStore', () => ({
+  useLayerStore: {
+    getState: () => ({
+      activeLayerId: 'layer-1',
+    }),
+  },
+}));
+
+// Mock editorStore
+vi.mock('../../state/editorStore', () => ({
+  useEditorStore: {
+    getState: () => ({
+      canvasWidth: 800,
+      canvasHeight: 600,
+    }),
+  },
+}));
+
 import FilterMenu from '../FilterMenu';
 
 describe('FilterMenu', () => {
@@ -112,5 +160,58 @@ describe('FilterMenu', () => {
     const distanceInput = screen.getByLabelText(/distance/i) as HTMLInputElement;
     fireEvent.change(distanceInput, { target: { value: '20' } });
     expect(distanceInput.value).toBe('20');
+  });
+
+  describe('WASM filter integration', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('Apply Gaussian Blur calls gaussianBlurLayer with sigma', () => {
+      render(<FilterMenu />);
+      fireEvent.click(screen.getByRole('button', { name: /gaussian blur/i }));
+
+      const sigmaInput = screen.getByLabelText(/sigma/i);
+      fireEvent.change(sigmaInput, { target: { value: '3.5' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+
+      expect(mockCaptureLayerRegion).toHaveBeenCalledWith('layer-1', 0, 0, 800, 600);
+      expect(mockGaussianBlurLayer).toHaveBeenCalledWith('layer-1', 3.5);
+      expect(mockRequestRender).toHaveBeenCalled();
+      expect(mockPushEditWithSnapshot).toHaveBeenCalledWith(
+        'Gaussian Blur',
+        'layer-1',
+        expect.anything(),
+        { x: 0, y: 0, w: 800, h: 600 },
+      );
+      expect(mockCommitSnapshot).toHaveBeenCalledWith('history-1', expect.anything());
+    });
+
+    it('Apply Box Blur calls boxBlurLayer with radius', () => {
+      render(<FilterMenu />);
+      fireEvent.click(screen.getByRole('button', { name: /box blur/i }));
+
+      const radiusInput = screen.getByLabelText(/radius/i);
+      fireEvent.change(radiusInput, { target: { value: '7' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+
+      expect(mockBoxBlurLayer).toHaveBeenCalledWith('layer-1', 7);
+      expect(mockRequestRender).toHaveBeenCalled();
+    });
+
+    it('Apply Motion Blur calls motionBlurLayer with angle and distance', () => {
+      render(<FilterMenu />);
+      fireEvent.click(screen.getByRole('button', { name: /motion blur/i }));
+
+      fireEvent.change(screen.getByLabelText(/angle/i), { target: { value: '90' } });
+      fireEvent.change(screen.getByLabelText(/distance/i), { target: { value: '15' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+
+      expect(mockMotionBlurLayer).toHaveBeenCalledWith('layer-1', 90, 15);
+      expect(mockRequestRender).toHaveBeenCalled();
+    });
   });
 });
