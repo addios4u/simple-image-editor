@@ -387,6 +387,10 @@ canvas {
   background: #2a2a2a;
 }
 
+.layer-item:last-child.active {
+  background: #2d5f8a;
+}
+
 .layer-visibility-btn {
   width: 20px;
   height: 20px;

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
-import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, requestRender } from '../engine/engineContext';
+import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, addLayer as engineAddLayer, requestRender } from '../engine/engineContext';
 
 const THUMB_SIZE = 40;
 
@@ -175,7 +175,13 @@ const LayerPanel: React.FC = () => {
       <div className="layer-actions">
         <button
           className="layer-add-btn"
-          onClick={addLayer}
+          onClick={() => {
+            addLayer();
+            // Sync: the store's addLayer just created a new layer — read it back
+            const newLayers = useLayerStore.getState().layers;
+            const newLayer = newLayers[newLayers.length - 1];
+            engineAddLayer(newLayer.id);
+          }}
           aria-label="Add Layer"
         >
           <Plus size={14} />
