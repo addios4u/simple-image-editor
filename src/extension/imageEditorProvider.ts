@@ -108,11 +108,26 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
             const result = await this._requestOraData(document);
             await vscode.workspace.fs.writeFile(document.uri, result.data);
         } else {
-            // Image file: save flattened composite + ORA sidecar
-            const format = this._getFormatFromUri(document.uri);
-            const data = await this._requestFileData(document, format);
-            await vscode.workspace.fs.writeFile(document.uri, data);
-            await this._saveOrDeleteOraSidecar(document);
+            // Image file: check layer count to decide save strategy
+            const oraResult = await this._requestOraData(document);
+
+            if (oraResult.layerCount > 1) {
+                // Multiple layers: save ORA sidecar only, preserve original
+                const oraUri = vscode.Uri.file(document.uri.path + '.ora');
+                await vscode.workspace.fs.writeFile(oraUri, oraResult.data);
+            } else {
+                // Single layer: save flattened to original, clean up stale sidecar
+                const format = this._getFormatFromUri(document.uri);
+                const data = await this._requestFileData(document, format);
+                await vscode.workspace.fs.writeFile(document.uri, data);
+                const oraUri = vscode.Uri.file(document.uri.path + '.ora');
+                try {
+                    await vscode.workspace.fs.stat(oraUri);
+                    await vscode.workspace.fs.delete(oraUri);
+                } catch {
+                    // No sidecar to delete
+                }
+            }
         }
 
         document.clearEdits();

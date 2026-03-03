@@ -339,20 +339,11 @@ describe('ImageEditorProvider', () => {
                 mockDocument, panel, { isCancellationRequested: false } as any
             );
 
-            // Main file data response
-            const mainBytes = [0xAA, 0xBB];
             // ORA data response (fake ZIP bytes)
             const oraBytes = [0x50, 0x4B, 0x03, 0x04];
 
             mockPostMessage.mockImplementation((msg: any) => {
-                if (msg.type === 'getFileData') {
-                    setTimeout(() => {
-                        getHandler()({
-                            type: 'getFileDataResponse',
-                            body: { requestId: msg.body.requestId, data: mainBytes },
-                        });
-                    }, 0);
-                } else if (msg.type === 'getOraData') {
+                if (msg.type === 'getOraData') {
                     setTimeout(() => {
                         getHandler()({
                             type: 'getOraDataResponse',
@@ -368,9 +359,9 @@ describe('ImageEditorProvider', () => {
                 mockDocument, { isCancellationRequested: false } as any
             );
 
-            // Main file written
-            expect(mockWriteFile).toHaveBeenCalledWith(mockUri, new Uint8Array(mainBytes));
-            // ORA sidecar written
+            // Original file should NOT be written when layerCount > 1
+            expect(mockWriteFile).toHaveBeenCalledTimes(1);
+            // Only ORA sidecar written
             expect(mockWriteFile).toHaveBeenCalledWith(
                 expect.objectContaining({ path: '/test/image.png.ora' }),
                 new Uint8Array(oraBytes),
