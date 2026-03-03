@@ -86,6 +86,15 @@ describe('ImageDocument', () => {
         expect(document.getData()).toEqual(newData);
     });
 
+    it('should clear edits and become not dirty', () => {
+        document.applyEdit({ id: 'e1', kind: 'brush', data: {}, timestamp: 1 });
+        expect(document.isDirty).toBe(true);
+
+        document.clearEdits();
+        expect(document.isDirty).toBe(false);
+        expect(document.edits).toEqual([]);
+    });
+
     it('should implement dispose without throwing', () => {
         expect(() => document.dispose()).not.toThrow();
     });

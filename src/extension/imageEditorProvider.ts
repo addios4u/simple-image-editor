@@ -10,6 +10,17 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
     private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<ImageDocument>>();
     public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
+    /** Maps a document to its active webview panel for request-response communication. */
+    private readonly _documentPanelMap = new Map<ImageDocument, vscode.WebviewPanel>();
+
+    /** Pending request-response callbacks keyed by requestId. */
+    private readonly _pendingRequests = new Map<string, {
+        resolve: (data: Uint8Array) => void;
+        reject: (err: Error) => void;
+    }>();
+
+    private _nextRequestId = 1;
+
     constructor(context: vscode.ExtensionContext) {
         this._context = context;
     }
@@ -41,6 +52,8 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         webviewPanel: vscode.WebviewPanel,
         _token: vscode.CancellationToken
     ): Promise<void> {
+        this._documentPanelMap.set(document, webviewPanel);
+
         webviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [this._context.extensionUri],
@@ -57,6 +70,7 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
 
         webviewPanel.onDidDispose(() => {
             messageDisposable.dispose();
+            this._documentPanelMap.delete(document);
         });
     }
 
@@ -64,7 +78,10 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         document: ImageDocument,
         _cancellation: vscode.CancellationToken
     ): Promise<void> {
-        await vscode.workspace.fs.writeFile(document.uri, document.getData());
+        const format = this._getFormatFromUri(document.uri);
+        const data = await this._requestFileData(document, format);
+        await vscode.workspace.fs.writeFile(document.uri, data);
+        document.clearEdits();
     }
 
     public async saveCustomDocumentAs(
@@ -72,7 +89,9 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         destination: vscode.Uri,
         _cancellation: vscode.CancellationToken
     ): Promise<void> {
-        await vscode.workspace.fs.writeFile(destination, document.getData());
+        const format = this._getFormatFromUri(destination);
+        const data = await this._requestFileData(document, format);
+        await vscode.workspace.fs.writeFile(destination, data);
     }
 
     public async revertCustomDocument(
@@ -88,7 +107,9 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         context: vscode.CustomDocumentBackupContext,
         _cancellation: vscode.CancellationToken
     ): Promise<vscode.CustomDocumentBackup> {
-        await vscode.workspace.fs.writeFile(context.destination, document.getData());
+        const format = this._getFormatFromUri(document.uri);
+        const data = await this._requestFileData(document, format);
+        await vscode.workspace.fs.writeFile(context.destination, data);
         return {
             id: context.destination.toString(),
             delete: async () => {
@@ -99,6 +120,55 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                 }
             },
         };
+    }
+
+    /**
+     * Request composited file data from the webview.
+     * Falls back to the document's original data if the panel is not available.
+     */
+    private _requestFileData(document: ImageDocument, format: string): Promise<Uint8Array> {
+        const panel = this._documentPanelMap.get(document);
+        if (!panel) {
+            return Promise.resolve(document.getData());
+        }
+
+        const requestId = `req-${this._nextRequestId++}`;
+
+        return new Promise<Uint8Array>((resolve, reject) => {
+            this._pendingRequests.set(requestId, { resolve, reject });
+
+            panel.webview.postMessage({
+                type: 'getFileData',
+                body: { requestId, format },
+            });
+
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                if (this._pendingRequests.has(requestId)) {
+                    this._pendingRequests.delete(requestId);
+                    reject(new Error('Timeout waiting for file data from webview'));
+                }
+            }, 30000);
+        });
+    }
+
+    /** Extract image format from a URI's file extension. */
+    private _getFormatFromUri(uri: vscode.Uri): string {
+        const ext = uri.path.split('.').pop()?.toLowerCase() ?? '';
+        switch (ext) {
+            case 'jpg':
+            case 'jpeg':
+                return 'jpeg';
+            case 'gif':
+                return 'gif';
+            case 'bmp':
+                return 'bmp';
+            case 'webp':
+                return 'webp';
+            case 'png':
+            default:
+                return 'png';
+        }
     }
 
     private _handleMessage(
@@ -129,13 +199,17 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                 });
                 break;
             }
-            case 'getFileData': {
-                const data = document.getData();
-                panel.webview.postMessage({
-                    type: 'getFileDataResponse',
-                    requestId: message.requestId,
-                    body: Array.from(data),
-                });
+            case 'getFileDataResponse': {
+                const { requestId, data, error } = message.body;
+                const pending = this._pendingRequests.get(requestId);
+                if (pending) {
+                    this._pendingRequests.delete(requestId);
+                    if (error) {
+                        pending.reject(new Error(error));
+                    } else {
+                        pending.resolve(new Uint8Array(data));
+                    }
+                }
                 break;
             }
         }

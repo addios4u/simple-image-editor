@@ -27,6 +27,10 @@ export class ImageDocument implements vscode.CustomDocument {
         this._edits.push(edit);
     }
 
+    public clearEdits(): void {
+        this._edits = [];
+    }
+
     public getData(): Uint8Array {
         return this._data;
     }
