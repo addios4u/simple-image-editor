@@ -128,6 +128,7 @@ const Canvas: React.FC = () => {
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
       tool.onPointerDown(toToolEvent(e, zoom));
     },
     [tool, zoom],
@@ -144,6 +145,7 @@ const Canvas: React.FC = () => {
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      e.currentTarget.releasePointerCapture(e.pointerId);
       tool.onPointerUp(toToolEvent(e, zoom));
     },
     [tool, zoom],
