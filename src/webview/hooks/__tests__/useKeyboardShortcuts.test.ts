@@ -99,8 +99,17 @@ describe('useKeyboardShortcuts', () => {
     });
 
     it('S key switches to select tool', () => {
+      useEditorStore.setState({ activeTool: 'brush' });
       renderHook(() => useKeyboardShortcuts());
       fireKey('s');
+      expect(useEditorStore.getState().activeTool).toBe('select');
+    });
+
+    it('S key toggles selectionShape when already on select', () => {
+      useEditorStore.setState({ activeTool: 'select', selectionShape: 'rectangle' });
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('s');
+      expect(useEditorStore.getState().selectionShape).toBe('ellipse');
       expect(useEditorStore.getState().activeTool).toBe('select');
     });
 

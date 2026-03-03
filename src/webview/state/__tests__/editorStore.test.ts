@@ -14,6 +14,7 @@ describe('editorStore', () => {
       canvasWidth: 800,
       canvasHeight: 600,
       activeTab: 'layers',
+      selectionShape: 'rectangle',
     });
   });
 
@@ -76,6 +77,20 @@ describe('editorStore', () => {
 
     setStrokeColor('#00ff00');
     expect(useEditorStore.getState().strokeColor).toBe('#00ff00');
+  });
+
+  describe('selectionShape', () => {
+    it('initial selectionShape is rectangle', () => {
+      expect(useEditorStore.getState().selectionShape).toBe('rectangle');
+    });
+
+    it('toggleSelectionShape toggles to ellipse then back', () => {
+      useEditorStore.getState().toggleSelectionShape();
+      expect(useEditorStore.getState().selectionShape).toBe('ellipse');
+
+      useEditorStore.getState().toggleSelectionShape();
+      expect(useEditorStore.getState().selectionShape).toBe('rectangle');
+    });
   });
 
   describe('selection', () => {

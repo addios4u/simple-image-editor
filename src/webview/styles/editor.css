@@ -1085,3 +1085,15 @@ canvas {
     background-position: 0 -8px, 8px 0, 100% 8px, -8px 100%;
   }
 }
+
+/* --- SVG Marching Ants (rect + ellipse) --- */
+
+.marching-ants-stroke {
+  animation: svg-marching-ants 400ms linear infinite;
+}
+
+@keyframes svg-marching-ants {
+  to {
+    stroke-dashoffset: -8;
+  }
+}

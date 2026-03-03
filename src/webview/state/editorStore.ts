@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export type EditorMode = 'viewer' | 'editor';
 export type ToolType = 'move' | 'select' | 'brush' | 'text';
 export type SidebarTab = 'layers' | 'properties' | 'ai';
+export type SelectionShape = 'rectangle' | 'ellipse';
 
 export interface SelectionRect {
   x: number;
@@ -26,6 +27,7 @@ interface EditorState {
   fileName: string;
   strokeWidth: number;
   selection: SelectionRect | null;
+  selectionShape: SelectionShape;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -38,6 +40,7 @@ interface EditorState {
   setImageData: (data: Uint8Array, fileName: string) => void;
   setStrokeWidth: (width: number) => void;
   setSelection: (sel: SelectionRect | null) => void;
+  toggleSelectionShape: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -55,6 +58,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   fileName: '',
   strokeWidth: 5,
   selection: null,
+  selectionShape: 'rectangle',
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -66,4 +70,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setImageData: (data, fileName) => set({ imageData: data, fileName }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
   setSelection: (sel) => set({ selection: sel }),
+  toggleSelectionShape: () =>
+    set((state) => ({
+      selectionShape: state.selectionShape === 'rectangle' ? 'ellipse' : 'rectangle',
+    })),
 }));

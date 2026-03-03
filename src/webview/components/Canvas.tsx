@@ -46,6 +46,8 @@ const moveConfig: MoveToolConfig = {
 
 const marqueeConfig: MarqueeToolConfig = {
   setSelection: (rect) => useEditorStore.getState().setSelection(rect),
+  getSelection: () => useEditorStore.getState().selection,
+  getSelectionShape: () => useEditorStore.getState().selectionShape,
 };
 
 function createTool(type: ToolType): BaseTool {
@@ -86,6 +88,7 @@ const Canvas: React.FC = () => {
   const zoom = useEditorStore((s) => s.zoom);
   const activeTool = useEditorStore((s) => s.activeTool);
   const selection = useEditorStore((s) => s.selection);
+  const selectionShape = useEditorStore((s) => s.selectionShape);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -182,9 +185,9 @@ const Canvas: React.FC = () => {
               onPointerUp={handlePointerUp}
             />
             {selection && selection.width > 0 && selection.height > 0 && (
-              <div
+              <svg
                 data-testid="selection-overlay"
-                className="selection-overlay marching-ants"
+                className="selection-overlay"
                 style={{
                   position: 'absolute',
                   left: selection.x,
@@ -192,8 +195,35 @@ const Canvas: React.FC = () => {
                   width: selection.width,
                   height: selection.height,
                   pointerEvents: 'none',
+                  overflow: 'visible',
                 }}
-              />
+              >
+                {selectionShape === 'ellipse' ? (
+                  <ellipse
+                    cx={selection.width / 2}
+                    cy={selection.height / 2}
+                    rx={selection.width / 2 - 0.5}
+                    ry={selection.height / 2 - 0.5}
+                    fill="none"
+                    stroke="black"
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                    className="marching-ants-stroke"
+                  />
+                ) : (
+                  <rect
+                    x="0.5"
+                    y="0.5"
+                    width={selection.width - 1}
+                    height={selection.height - 1}
+                    fill="none"
+                    stroke="black"
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                    className="marching-ants-stroke"
+                  />
+                )}
+              </svg>
             )}
           </div>
         </div>

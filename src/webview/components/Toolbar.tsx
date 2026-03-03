@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Minus, Plus, MousePointer2, BoxSelect, PenLine, Type, Download } from 'lucide-react';
+import { Minus, Plus, MousePointer2, BoxSelect, Circle, PenLine, Type, Download } from 'lucide-react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
 import { compositeToBytes } from '../engine/engineContext';
@@ -17,9 +17,8 @@ interface ToolDef {
   label: string;
 }
 
-const tools: ToolDef[] = [
+const staticTools: ToolDef[] = [
   { type: 'move', icon: <MousePointer2 size={18} />, label: 'Move' },
-  { type: 'select', icon: <BoxSelect size={18} />, label: 'Select' },
   { type: 'brush', icon: <PenLine size={18} />, label: 'Brush' },
   { type: 'text', icon: <Type size={18} />, label: 'Text' },
 ];
@@ -34,6 +33,8 @@ const Toolbar: React.FC = () => {
   const fileName = useEditorStore((s) => s.fileName);
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
+  const selectionShape = useEditorStore((s) => s.selectionShape);
+  const toggleSelectionShape = useEditorStore((s) => s.toggleSelectionShape);
 
   const [copied, setCopied] = useState('');
 
@@ -105,11 +106,26 @@ const Toolbar: React.FC = () => {
         </div>
       </div>
       <div className="toolbar-separator" />
-      {tools.map((tool) => (
+      {[
+        staticTools[0],
+        {
+          type: 'select' as ToolType,
+          icon: selectionShape === 'ellipse' ? <Circle size={18} /> : <BoxSelect size={18} />,
+          label: selectionShape === 'ellipse' ? 'Select (Ellipse)' : 'Select (Rect)',
+        },
+        staticTools[1],
+        staticTools[2],
+      ].map((tool) => (
         <button
           key={tool.type}
           className={`toolbar-btn${activeTool === tool.type ? ' active' : ''}`}
-          onClick={() => setActiveTool(tool.type)}
+          onClick={() => {
+            if (activeTool === tool.type && tool.type === 'select') {
+              toggleSelectionShape();
+            } else {
+              setActiveTool(tool.type);
+            }
+          }}
           title={tool.label}
         >
           {tool.icon}

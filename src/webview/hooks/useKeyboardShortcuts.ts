@@ -89,6 +89,16 @@ export function useKeyboardShortcuts(): void {
       }
 
       // --- Single-key tool shortcuts (no modifier) ---
+      if (key === 's') {
+        e.preventDefault();
+        const store = useEditorStore.getState();
+        if (store.activeTool === 'select') {
+          store.toggleSelectionShape();
+        } else {
+          store.setActiveTool('select');
+        }
+        return;
+      }
       const tool = TOOL_KEYS[key];
       if (tool) {
         e.preventDefault();

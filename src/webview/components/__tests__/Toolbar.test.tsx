@@ -47,4 +47,31 @@ describe('Toolbar', () => {
     fireEvent.click(moveButton);
     expect(useEditorStore.getState().activeTool).toBe('move');
   });
+
+  describe('selection shape toggle', () => {
+    it('clicking select button when already active toggles shape', () => {
+      useEditorStore.setState({ activeTool: 'select', selectionShape: 'rectangle' });
+      render(<Toolbar />);
+      const selectButton = screen.getByRole('button', { name: /rect/i });
+
+      fireEvent.click(selectButton);
+      expect(useEditorStore.getState().selectionShape).toBe('ellipse');
+    });
+
+    it('shows ellipse label when selectionShape is ellipse', () => {
+      useEditorStore.setState({ activeTool: 'select', selectionShape: 'ellipse' });
+      render(<Toolbar />);
+      expect(screen.getByRole('button', { name: /ellipse/i })).toBeInTheDocument();
+    });
+
+    it('clicking select from another tool activates select without toggling shape', () => {
+      useEditorStore.setState({ activeTool: 'brush', selectionShape: 'rectangle' });
+      render(<Toolbar />);
+      const selectButton = screen.getByRole('button', { name: /rect/i });
+
+      fireEvent.click(selectButton);
+      expect(useEditorStore.getState().activeTool).toBe('select');
+      expect(useEditorStore.getState().selectionShape).toBe('rectangle');
+    });
+  });
 });
