@@ -339,7 +339,7 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}' 'wasm-unsafe-eval'; img-src ${cspSource} data: blob:; font-src ${cspSource};">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}' 'wasm-unsafe-eval'; connect-src ${cspSource}; img-src ${cspSource} data: blob:; font-src ${cspSource};">
     <meta property="csp-nonce" content="${nonce}">
     <link href="${styleUri}" rel="stylesheet">
     <title>Simple Image Editor</title>
