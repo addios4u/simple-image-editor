@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen, LockKeyhole, Move } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
 import { getLayerImageData } from '../engine/engineContext';
 
@@ -96,14 +96,6 @@ const LayerPanel: React.FC = () => {
             }}
           />
           <span className="layer-controls-unit">%</span>
-        </div>
-        <div className="layer-controls-row">
-          <Lock size={12} className="layer-controls-icon" />
-          <LockKeyhole size={12} className="layer-controls-icon" />
-          <Move size={12} className="layer-controls-icon" />
-          <span className="layer-controls-spacer" />
-          <span className="layer-controls-label">Fill:</span>
-          <span className="layer-controls-value">100%</span>
         </div>
       </div>
 

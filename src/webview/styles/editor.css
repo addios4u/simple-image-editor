@@ -320,12 +320,6 @@ canvas {
   flex-shrink: 0;
 }
 
-.layer-controls-value {
-  font-size: 10px;
-  color: var(--text-primary);
-  flex-shrink: 0;
-}
-
 .layer-controls-unit {
   font-size: 10px;
   color: var(--text-primary);
@@ -351,19 +345,6 @@ canvas {
   margin: 0;
 }
 
-.layer-controls-icon {
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.layer-controls-icon:hover {
-  color: var(--text-primary);
-}
-
-.layer-controls-spacer {
-  flex: 1;
-}
 
 .layer-divider {
   height: 1px;
