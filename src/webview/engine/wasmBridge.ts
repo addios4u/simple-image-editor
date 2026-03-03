@@ -8,6 +8,7 @@
 
 /** Shape of the wasm-bindgen generated module after instantiation. */
 export interface WasmModule {
+  memory: WebAssembly.Memory;
   init(): void;
   PixelBuffer: {
     new (width: number, height: number): WasmPixelBuffer;
@@ -75,12 +76,32 @@ export interface WasmRegionSnapshot {
 }
 
 export interface WasmLayerCompositor {
+  width(): number;
+  height(): number;
   add_layer(): number;
   layer_count(): number;
   set_layer_opacity(index: number, opacity: number): void;
   set_layer_visible(index: number, visible: boolean): void;
   remove_layer(index: number): boolean;
   composite(): WasmPixelBuffer;
+  brush_stroke_layer(
+    index: number, cx: number, cy: number,
+    color: number, size: number, hardness: number,
+  ): void;
+  fill_rect_layer(
+    index: number, x: number, y: number,
+    w: number, h: number, rgba: number,
+  ): void;
+  get_layer_data_ptr(index: number): number;
+  get_layer_data_len(index: number): number;
+  set_layer_data(index: number, data: Uint8Array): void;
+  box_blur_layer(index: number, radius: number): void;
+  gaussian_blur_layer(index: number, sigma: number): void;
+  motion_blur_layer(index: number, angle: number, distance: number): void;
+  capture_layer_region(
+    index: number, x: number, y: number, w: number, h: number,
+  ): WasmRegionSnapshot;
+  restore_layer_region(index: number, snapshot: WasmRegionSnapshot): void;
   free(): void;
 }
 
