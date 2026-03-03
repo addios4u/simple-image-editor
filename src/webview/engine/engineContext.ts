@@ -1,0 +1,340 @@
+/**
+ * Singleton engine context that manages WASM instances and the rendering pipeline.
+ *
+ * Holds the LayerCompositor, Clipboard, and RenderLoop — objects that are not
+ * serializable and therefore kept outside of Zustand stores.
+ */
+
+import type {
+  WasmModule,
+  WasmLayerCompositor,
+  WasmClipboard,
+  WasmRegionSnapshot,
+} from './wasmBridge';
+import {
+  init as wasmInit,
+  getModule,
+  isInitialized,
+  decodeImage,
+  encodeImage,
+  createLayerCompositor,
+  createClipboard,
+} from './wasmBridge';
+import { RenderLoop } from './renderLoop';
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+let compositor: WasmLayerCompositor | null = null;
+let clipboard: WasmClipboard | null = null;
+let renderLoop: RenderLoop | null = null;
+let canvasCtx: CanvasRenderingContext2D | null = null;
+let wasmMemory: WebAssembly.Memory | null = null;
+let canvasWidth = 0;
+let canvasHeight = 0;
+
+/** Maps UI layer id → WASM compositor layer index. */
+const layerIndexMap = new Map<string, number>();
+
+// ---------------------------------------------------------------------------
+// Initialisation
+// ---------------------------------------------------------------------------
+
+/**
+ * Load and initialise the WASM module. Must be called once before any other
+ * engine function.
+ */
+export async function initEngine(
+  loader: () => Promise<WasmModule>,
+): Promise<void> {
+  if (isInitialized()) return;
+  await wasmInit(loader);
+  const mod = getModule();
+  wasmMemory = mod.memory;
+  clipboard = createClipboard();
+}
+
+/**
+ * Bind a canvas 2D context to the rendering pipeline.
+ */
+export function setupCanvas(ctx: CanvasRenderingContext2D): void {
+  canvasCtx = ctx;
+}
+
+/**
+ * Set up (or replace) the render loop with the given callback.
+ */
+export function setupRenderLoop(loop: RenderLoop): void {
+  renderLoop?.stop();
+  renderLoop = loop;
+}
+
+// ---------------------------------------------------------------------------
+// Image loading
+// ---------------------------------------------------------------------------
+
+/**
+ * Decode image data, create a compositor of the right size, and load pixels
+ * into the first layer.
+ *
+ * @returns The decoded image dimensions.
+ */
+export function loadImage(
+  data: Uint8Array,
+  layerId: string,
+): { width: number; height: number } {
+  const decoded = decodeImage(data);
+  const w = decoded.width();
+  const h = decoded.height();
+
+  // (Re-)create compositor at the decoded size.
+  compositor?.free();
+  compositor = createLayerCompositor(w, h);
+  canvasWidth = w;
+  canvasHeight = h;
+
+  // Add background layer and paste decoded pixels.
+  layerIndexMap.clear();
+  const idx = compositor.add_layer();
+  layerIndexMap.set(layerId, idx);
+
+  // Copy decoded pixels into the layer via set_layer_data.
+  const ptr = decoded.data_ptr();
+  const len = decoded.data_len();
+  if (wasmMemory) {
+    const srcView = new Uint8Array(wasmMemory.buffer, ptr, len);
+    compositor.set_layer_data(idx, srcView);
+  }
+
+  decoded.free();
+  return { width: w, height: h };
+}
+
+// ---------------------------------------------------------------------------
+// Layer management
+// ---------------------------------------------------------------------------
+
+export function addLayer(layerId: string): number {
+  if (!compositor) return -1;
+  const idx = compositor.add_layer();
+  layerIndexMap.set(layerId, idx);
+  return idx;
+}
+
+export function removeLayer(layerId: string): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.remove_layer(idx);
+  layerIndexMap.delete(layerId);
+
+  // Re-index: every layer after the removed one shifts down by 1.
+  for (const [id, i] of layerIndexMap) {
+    if (i > idx) {
+      layerIndexMap.set(id, i - 1);
+    }
+  }
+}
+
+export function getLayerIndex(layerId: string): number {
+  return layerIndexMap.get(layerId) ?? -1;
+}
+
+export function setLayerOpacity(layerId: string, opacity: number): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.set_layer_opacity(idx, opacity);
+}
+
+export function setLayerVisible(layerId: string, visible: boolean): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.set_layer_visible(idx, visible);
+}
+
+// ---------------------------------------------------------------------------
+// Drawing operations (delegate to compositor layer methods)
+// ---------------------------------------------------------------------------
+
+export function brushStrokeLayer(
+  layerId: string,
+  cx: number, cy: number,
+  color: number, size: number, hardness: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.brush_stroke_layer(idx, cx, cy, color, size, hardness);
+}
+
+export function fillRectLayer(
+  layerId: string,
+  x: number, y: number, w: number, h: number,
+  rgba: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.fill_rect_layer(idx, x, y, w, h, rgba);
+}
+
+// ---------------------------------------------------------------------------
+// Filters
+// ---------------------------------------------------------------------------
+
+export function boxBlurLayer(layerId: string, radius: number): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.box_blur_layer(idx, radius);
+}
+
+export function gaussianBlurLayer(layerId: string, sigma: number): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.gaussian_blur_layer(idx, sigma);
+}
+
+export function motionBlurLayer(
+  layerId: string, angle: number, distance: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.motion_blur_layer(idx, angle, distance);
+}
+
+// ---------------------------------------------------------------------------
+// History (capture / restore)
+// ---------------------------------------------------------------------------
+
+export function captureLayerRegion(
+  layerId: string,
+  x: number, y: number, w: number, h: number,
+): WasmRegionSnapshot | null {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return null;
+  return compositor.capture_layer_region(idx, x, y, w, h);
+}
+
+export function restoreLayerRegion(
+  layerId: string,
+  snapshot: WasmRegionSnapshot,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.restore_layer_region(idx, snapshot);
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Mark the canvas as needing a re-render on the next animation frame.
+ */
+export function requestRender(): void {
+  renderLoop?.requestRender();
+}
+
+/**
+ * Composite all layers and draw the result to the bound canvas context.
+ * Called by the RenderLoop callback.
+ */
+export function compositeAndRender(): void {
+  if (!compositor || !canvasCtx || !wasmMemory) return;
+
+  const composited = compositor.composite();
+  const ptr = composited.data_ptr();
+  const len = composited.data_len();
+  const w = composited.width();
+  const h = composited.height();
+
+  // Zero-copy: create a typed-array view directly over WASM linear memory.
+  const pixels = new Uint8ClampedArray(wasmMemory.buffer, ptr, len);
+  const imageData = new ImageData(pixels, w, h);
+  canvasCtx.putImageData(imageData, 0, 0);
+
+  composited.free();
+}
+
+/**
+ * Composite all layers and encode to the specified format.
+ * Used by the save pipeline.
+ */
+export function compositeToBytes(format: string): Uint8Array {
+  if (!compositor) return new Uint8Array(0);
+  const composited = compositor.composite();
+  const encoded = encodeImage(composited, format);
+  composited.free();
+  return encoded;
+}
+
+/**
+ * Encode a single layer to PNG bytes (for OpenRaster export).
+ */
+export function encodeLayerToPng(layerId: string): Uint8Array {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !wasmMemory) return new Uint8Array(0);
+
+  const w = compositor.width();
+  const h = compositor.height();
+  const mod = getModule();
+
+  // Create a temporary PixelBuffer and copy the layer's raw pixels into it.
+  const tmpBuf = new mod.PixelBuffer(w, h);
+
+  // After allocation, WASM memory may have grown — read pointers fresh.
+  const dstPtr = tmpBuf.data_ptr();
+  const dstLen = tmpBuf.data_len();
+  const layerPtr = compositor.get_layer_data_ptr(idx);
+  const layerLen = compositor.get_layer_data_len(idx);
+
+  if (layerPtr && layerLen > 0 && dstLen === layerLen) {
+    const dst = new Uint8Array(wasmMemory.buffer, dstPtr, dstLen);
+    const src = new Uint8Array(wasmMemory.buffer, layerPtr, layerLen);
+    dst.set(src);
+  }
+
+  const encoded = encodeImage(tmpBuf, 'png');
+  tmpBuf.free();
+  return encoded;
+}
+
+// ---------------------------------------------------------------------------
+// Accessors
+// ---------------------------------------------------------------------------
+
+export function getCompositor(): WasmLayerCompositor | null {
+  return compositor;
+}
+
+export function getClipboard(): WasmClipboard | null {
+  return clipboard;
+}
+
+export function getWasmMemory(): WebAssembly.Memory | null {
+  return wasmMemory;
+}
+
+export function getCanvasSize(): { width: number; height: number } {
+  return { width: canvasWidth, height: canvasHeight };
+}
+
+export function isEngineReady(): boolean {
+  return isInitialized() && compositor !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup
+// ---------------------------------------------------------------------------
+
+export function destroy(): void {
+  renderLoop?.stop();
+  renderLoop = null;
+  compositor?.free();
+  compositor = null;
+  clipboard?.free();
+  clipboard = null;
+  canvasCtx = null;
+  wasmMemory = null;
+  canvasWidth = 0;
+  canvasHeight = 0;
+  layerIndexMap.clear();
+}
