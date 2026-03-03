@@ -234,6 +234,12 @@ export function setLayerBlendMode(layerId: string, mode: number): void {
   compositor.set_layer_blend_mode(idx, mode);
 }
 
+export function setLayerOffset(layerId: string, x: number, y: number): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.set_layer_offset(idx, x, y);
+}
+
 export function moveLayer(fromLayerId: string, toLayerId: string): void {
   const fromIdx = layerIndexMap.get(fromLayerId);
   const toIdx = layerIndexMap.get(toLayerId);

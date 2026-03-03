@@ -83,6 +83,9 @@ export interface WasmLayerCompositor {
   set_layer_opacity(index: number, opacity: number): void;
   set_layer_visible(index: number, visible: boolean): void;
   set_layer_blend_mode(index: number, mode: number): void;
+  set_layer_offset(index: number, x: number, y: number): void;
+  get_layer_offset_x(index: number): number;
+  get_layer_offset_y(index: number): number;
   remove_layer(index: number): boolean;
   move_layer(from_index: number, to_index: number): boolean;
   composite(): WasmPixelBuffer;

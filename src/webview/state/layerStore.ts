@@ -7,6 +7,8 @@ export interface Layer {
   opacity: number;
   locked: boolean;
   blendMode: string;
+  offsetX: number;
+  offsetY: number;
 }
 
 interface LayerState {
@@ -19,6 +21,7 @@ interface LayerState {
   setLayerOpacity: (id: string, opacity: number) => void;
   setLayerLocked: (id: string, locked: boolean) => void;
   setLayerBlendMode: (id: string, blendMode: string) => void;
+  setLayerOffset: (id: string, x: number, y: number) => void;
   setActiveLayer: (id: string) => void;
   reorderLayers: (layerIds: string[]) => void;
   duplicateLayer: (id: string) => void;
@@ -32,14 +35,14 @@ interface LayerState {
 let nextId = 2;
 
 export const useLayerStore = create<LayerState>((set, get) => ({
-  layers: [{ id: 'layer-1', name: 'Background', visible: true, opacity: 1, locked: false, blendMode: 'Normal' }],
+  layers: [{ id: 'layer-1', name: 'Background', visible: true, opacity: 1, locked: false, blendMode: 'Normal', offsetX: 0, offsetY: 0 }],
   activeLayerId: 'layer-1',
 
   addLayer: () =>
     set((state) => {
       const id = `layer-${nextId++}`;
       const name = `Layer ${nextId - 1}`;
-      const newLayer: Layer = { id, name, visible: true, opacity: 1, locked: false, blendMode: 'Normal' };
+      const newLayer: Layer = { id, name, visible: true, opacity: 1, locked: false, blendMode: 'Normal', offsetX: 0, offsetY: 0 };
       return { layers: [...state.layers, newLayer] };
     }),
 
@@ -77,6 +80,13 @@ export const useLayerStore = create<LayerState>((set, get) => ({
     set((state) => ({
       layers: state.layers.map((l) =>
         l.id === id ? { ...l, blendMode } : l,
+      ),
+    })),
+
+  setLayerOffset: (id, x, y) =>
+    set((state) => ({
+      layers: state.layers.map((l) =>
+        l.id === id ? { ...l, offsetX: x, offsetY: y } : l,
       ),
     })),
 

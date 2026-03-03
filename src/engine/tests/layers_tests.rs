@@ -504,3 +504,57 @@ fn test_normal_blend_unchanged() {
     assert!(b >= 254, "blue should be ~255, got {}", b);
     assert!(a >= 254, "alpha should be ~255, got {}", a);
 }
+
+// --- Layer offset tests ---
+
+#[test]
+fn test_set_layer_offset() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+    assert_eq!(comp.get_layer_offset_x(idx), 0);
+    assert_eq!(comp.get_layer_offset_y(idx), 0);
+
+    comp.set_layer_offset(idx, 10, -5);
+    assert_eq!(comp.get_layer_offset_x(idx), 10);
+    assert_eq!(comp.get_layer_offset_y(idx), -5);
+
+    // Invalid index should not panic
+    comp.set_layer_offset(99, 1, 1);
+    assert_eq!(comp.get_layer_offset_x(99), 0);
+}
+
+#[test]
+fn test_composite_with_offset() {
+    // 4x4 canvas, bottom layer red at (0,0), top layer blue offset by (2,0)
+    let mut comp = LayerCompositor::new(4, 4);
+
+    let bottom = comp.add_layer();
+    comp.fill_rect_layer(bottom, 0, 0, 4, 4, 0xFF0000FF); // all red
+
+    let top = comp.add_layer();
+    // Paint blue at column 0 only (x=0, full height)
+    comp.fill_rect_layer(top, 0, 0, 1, 4, 0x0000FFFF);
+    // Offset top layer by +2 in x → blue column should appear at x=2
+    comp.set_layer_offset(top, 2, 0);
+
+    let result = comp.composite();
+
+    // At (0,0): only red (top layer's source pixel would be at x=-2, out of bounds)
+    let p00 = result.get_pixel(0, 0);
+    let r = (p00 >> 24) & 0xFF;
+    let b = (p00 >>  8) & 0xFF;
+    assert!(r >= 254, "x=0 should be red, got r={}", r);
+    assert!(b <= 1, "x=0 should have no blue, got b={}", b);
+
+    // At (2,0): blue on top of red → blue wins (opaque)
+    let p20 = result.get_pixel(2, 0);
+    let r2 = (p20 >> 24) & 0xFF;
+    let b2 = (p20 >>  8) & 0xFF;
+    assert!(r2 <= 1, "x=2 should have blue over red, got r={}", r2);
+    assert!(b2 >= 254, "x=2 should be blue, got b={}", b2);
+
+    // At (3,0): no blue content at source x=1 (we only painted x=0) → red
+    let p30 = result.get_pixel(3, 0);
+    let r3 = (p30 >> 24) & 0xFF;
+    assert!(r3 >= 254, "x=3 should still be red, got r={}", r3);
+}

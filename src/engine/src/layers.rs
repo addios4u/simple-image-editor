@@ -72,6 +72,8 @@ pub struct Layer {
     pub opacity: f32,
     pub visible: bool,
     pub blend_mode: BlendMode,
+    pub offset_x: i32,
+    pub offset_y: i32,
 }
 
 /// Composites multiple layers into a single output PixelBuffer.
@@ -101,6 +103,8 @@ impl LayerCompositor {
             opacity: 1.0,
             visible: true,
             blend_mode: BlendMode::Normal,
+            offset_x: 0,
+            offset_y: 0,
         });
         self.layers.len() - 1
     }
@@ -129,6 +133,24 @@ impl LayerCompositor {
         if let Some(layer) = self.layers.get_mut(index) {
             layer.blend_mode = mode;
         }
+    }
+
+    /// Set the offset of a layer by index.
+    pub fn set_layer_offset(&mut self, index: usize, x: i32, y: i32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            layer.offset_x = x;
+            layer.offset_y = y;
+        }
+    }
+
+    /// Get the x offset of a layer.
+    pub fn get_layer_offset_x(&self, index: usize) -> i32 {
+        self.layers.get(index).map(|l| l.offset_x).unwrap_or(0)
+    }
+
+    /// Get the y offset of a layer.
+    pub fn get_layer_offset_y(&self, index: usize) -> i32 {
+        self.layers.get(index).map(|l| l.offset_y).unwrap_or(0)
     }
 
     /// Remove a layer by index. Returns true if it was removed.
@@ -271,7 +293,8 @@ impl LayerCompositor {
     /// Composite all visible layers into a new PixelBuffer (normal blend, alpha).
     pub fn composite(&self) -> PixelBuffer {
         let mut out = PixelBuffer::new(self.width, self.height);
-        let pixel_count = (self.width * self.height) as usize;
+        let w = self.width as i32;
+        let h = self.height as i32;
 
         for layer in &self.layers {
             if !layer.visible {
@@ -280,38 +303,50 @@ impl LayerCompositor {
             let src_data = layer.buffer.raw_data();
             let out_data = out.raw_data_mut();
 
-            for i in 0..pixel_count {
-                let base = i * 4;
-                let sr = src_data[base]     as f32 / 255.0;
-                let sg = src_data[base + 1] as f32 / 255.0;
-                let sb = src_data[base + 2] as f32 / 255.0;
-                let sa = (src_data[base + 3] as f32 / 255.0) * layer.opacity;
+            for dy in 0..h {
+                for dx in 0..w {
+                    // Source pixel in layer's local coordinate
+                    let sx = dx - layer.offset_x;
+                    let sy = dy - layer.offset_y;
 
-                let dr = out_data[base]     as f32 / 255.0;
-                let dg = out_data[base + 1] as f32 / 255.0;
-                let db = out_data[base + 2] as f32 / 255.0;
-                let da = out_data[base + 3] as f32 / 255.0;
+                    if sx < 0 || sx >= w || sy < 0 || sy >= h {
+                        continue;
+                    }
 
-                // Apply blend mode to get blended RGB
-                let br = blend_channel(layer.blend_mode, sr, dr);
-                let bg = blend_channel(layer.blend_mode, sg, dg);
-                let bb = blend_channel(layer.blend_mode, sb, db);
+                    let src_base = (sy as usize * self.width as usize + sx as usize) * 4;
+                    let dst_base = (dy as usize * self.width as usize + dx as usize) * 4;
 
-                let out_a = sa + da * (1.0 - sa);
-                let (or_, og, ob) = if out_a > 0.0 {
-                    (
-                        (br * sa + dr * da * (1.0 - sa)) / out_a,
-                        (bg * sa + dg * da * (1.0 - sa)) / out_a,
-                        (bb * sa + db * da * (1.0 - sa)) / out_a,
-                    )
-                } else {
-                    (0.0, 0.0, 0.0)
-                };
+                    let sr = src_data[src_base]     as f32 / 255.0;
+                    let sg = src_data[src_base + 1] as f32 / 255.0;
+                    let sb = src_data[src_base + 2] as f32 / 255.0;
+                    let sa = (src_data[src_base + 3] as f32 / 255.0) * layer.opacity;
 
-                out_data[base]     = (or_   * 255.0 + 0.5) as u8;
-                out_data[base + 1] = (og    * 255.0 + 0.5) as u8;
-                out_data[base + 2] = (ob    * 255.0 + 0.5) as u8;
-                out_data[base + 3] = (out_a * 255.0 + 0.5) as u8;
+                    let dr = out_data[dst_base]     as f32 / 255.0;
+                    let dg = out_data[dst_base + 1] as f32 / 255.0;
+                    let db = out_data[dst_base + 2] as f32 / 255.0;
+                    let da = out_data[dst_base + 3] as f32 / 255.0;
+
+                    // Apply blend mode to get blended RGB
+                    let br = blend_channel(layer.blend_mode, sr, dr);
+                    let bg = blend_channel(layer.blend_mode, sg, dg);
+                    let bb = blend_channel(layer.blend_mode, sb, db);
+
+                    let out_a = sa + da * (1.0 - sa);
+                    let (or_, og, ob) = if out_a > 0.0 {
+                        (
+                            (br * sa + dr * da * (1.0 - sa)) / out_a,
+                            (bg * sa + dg * da * (1.0 - sa)) / out_a,
+                            (bb * sa + db * da * (1.0 - sa)) / out_a,
+                        )
+                    } else {
+                        (0.0, 0.0, 0.0)
+                    };
+
+                    out_data[dst_base]     = (or_   * 255.0 + 0.5) as u8;
+                    out_data[dst_base + 1] = (og    * 255.0 + 0.5) as u8;
+                    out_data[dst_base + 2] = (ob    * 255.0 + 0.5) as u8;
+                    out_data[dst_base + 3] = (out_a * 255.0 + 0.5) as u8;
+                }
             }
         }
         out

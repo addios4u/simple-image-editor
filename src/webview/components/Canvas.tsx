@@ -2,11 +2,11 @@ import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react'
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
-import { MoveTool } from '../tools/MoveTool';
+import { MoveTool, type MoveToolConfig } from '../tools/MoveTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
-import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender, getCanvasSize } from '../engine/engineContext';
+import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender, getCanvasSize, setLayerOffset } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
@@ -26,6 +26,24 @@ const brushConfig: BrushToolConfig = {
   requestRender,
 };
 
+const moveConfig: MoveToolConfig = {
+  getActiveLayerId: () => useLayerStore.getState().activeLayerId,
+  getLayerOffset: (layerId) => {
+    const layer = useLayerStore.getState().layers.find((l) => l.id === layerId);
+    return { x: layer?.offsetX ?? 0, y: layer?.offsetY ?? 0 };
+  },
+  isLayerLocked: () => {
+    const { layers, activeLayerId } = useLayerStore.getState();
+    const layer = layers.find((l) => l.id === activeLayerId);
+    return layer?.locked ?? false;
+  },
+  setLayerOffset: (layerId, x, y) => {
+    useLayerStore.getState().setLayerOffset(layerId, x, y);
+    setLayerOffset(layerId, x, y);
+  },
+  requestRender,
+};
+
 const marqueeConfig: MarqueeToolConfig = {
   setSelection: (rect) => useEditorStore.getState().setSelection(rect),
 };
@@ -33,7 +51,7 @@ const marqueeConfig: MarqueeToolConfig = {
 function createTool(type: ToolType): BaseTool {
   switch (type) {
     case 'move':
-      return new MoveTool();
+      return new MoveTool(moveConfig);
     case 'select':
       return new MarqueeTool(marqueeConfig);
     case 'brush':
@@ -41,7 +59,7 @@ function createTool(type: ToolType): BaseTool {
     case 'text':
       return new TextTool();
     default:
-      return new MoveTool();
+      return new MoveTool(moveConfig);
   }
 }
 
@@ -164,15 +182,13 @@ const Canvas: React.FC = () => {
             {selection && selection.width > 0 && selection.height > 0 && (
               <div
                 data-testid="selection-overlay"
-                className="selection-overlay"
+                className="selection-overlay marching-ants"
                 style={{
                   position: 'absolute',
                   left: selection.x,
                   top: selection.y,
                   width: selection.width,
                   height: selection.height,
-                  border: '1px dashed #fff',
-                  outline: '1px dashed #000',
                   pointerEvents: 'none',
                 }}
               />

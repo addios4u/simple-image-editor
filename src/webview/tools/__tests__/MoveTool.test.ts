@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { MoveTool } from '../MoveTool';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { MoveTool, type MoveToolConfig } from '../MoveTool';
 
 describe('MoveTool', () => {
   let tool: MoveTool;
@@ -45,5 +45,39 @@ describe('MoveTool', () => {
 
     expect(tool.isDragging).toBe(false);
     expect(tool.getDragDelta()).toEqual({ dx: 0, dy: 0 });
+  });
+
+  describe('with config', () => {
+    let configTool: MoveTool;
+    const mockSetOffset = vi.fn();
+    const mockRender = vi.fn();
+    const config: MoveToolConfig = {
+      getActiveLayerId: () => 'layer-1',
+      getLayerOffset: () => ({ x: 10, y: 20 }),
+      isLayerLocked: () => false,
+      setLayerOffset: mockSetOffset,
+      requestRender: mockRender,
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      configTool = new MoveTool(config);
+    });
+
+    it('calls setLayerOffset on drag', () => {
+      configTool.onPointerDown({ x: 0, y: 0, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      configTool.onPointerMove({ x: 5, y: 10, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+
+      expect(mockSetOffset).toHaveBeenCalledWith('layer-1', 15, 30);
+      expect(mockRender).toHaveBeenCalled();
+    });
+
+    it('does not drag when layer is locked', () => {
+      const lockedConfig: MoveToolConfig = { ...config, isLayerLocked: () => true };
+      const lockedTool = new MoveTool(lockedConfig);
+
+      lockedTool.onPointerDown({ x: 0, y: 0, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      expect(lockedTool.isDragging).toBe(false);
+    });
   });
 });
