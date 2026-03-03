@@ -83,6 +83,7 @@ export interface WasmLayerCompositor {
   set_layer_opacity(index: number, opacity: number): void;
   set_layer_visible(index: number, visible: boolean): void;
   remove_layer(index: number): boolean;
+  move_layer(from_index: number, to_index: number): boolean;
   composite(): WasmPixelBuffer;
   brush_stroke_layer(
     index: number, cx: number, cy: number,

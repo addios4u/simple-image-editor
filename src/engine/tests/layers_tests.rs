@@ -329,3 +329,36 @@ fn test_width_and_height() {
     assert_eq!(comp.width(), 100);
     assert_eq!(comp.height(), 200);
 }
+
+#[test]
+fn test_move_layer() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let l0 = comp.add_layer();
+    let l1 = comp.add_layer();
+    let l2 = comp.add_layer();
+
+    // Paint each layer a different color
+    comp.get_layer_buffer_mut(l0).unwrap().fill_rect(0, 0, 2, 2, 0xFF0000FF); // red
+    comp.get_layer_buffer_mut(l1).unwrap().fill_rect(0, 0, 2, 2, 0x00FF00FF); // green
+    comp.get_layer_buffer_mut(l2).unwrap().fill_rect(0, 0, 2, 2, 0x0000FFFF); // blue
+
+    // Move layer 0 (red) to index 2 → order becomes [green, blue, red]
+    assert!(comp.move_layer(0, 2));
+    assert_eq!(comp.layer_count(), 3);
+
+    // The top layer (index 2) should now be red
+    let top_pixel = comp.get_layer_buffer_mut(2).unwrap().get_pixel(0, 0);
+    assert_eq!(top_pixel, 0xFF0000FF);
+
+    // Index 0 should be green
+    let bottom_pixel = comp.get_layer_buffer_mut(0).unwrap().get_pixel(0, 0);
+    assert_eq!(bottom_pixel, 0x00FF00FF);
+}
+
+#[test]
+fn test_move_layer_invalid_index() {
+    let mut comp = LayerCompositor::new(2, 2);
+    comp.add_layer();
+    assert!(!comp.move_layer(0, 5));
+    assert!(!comp.move_layer(5, 0));
+}

@@ -77,6 +77,16 @@ impl LayerCompositor {
         }
     }
 
+    /// Move a layer from one index to another. Returns true if successful.
+    pub fn move_layer(&mut self, from_index: usize, to_index: usize) -> bool {
+        if from_index >= self.layers.len() || to_index >= self.layers.len() {
+            return false;
+        }
+        let layer = self.layers.remove(from_index);
+        self.layers.insert(to_index, layer);
+        true
+    }
+
     /// Get the width of the compositor canvas.
     pub fn width(&self) -> u32 {
         self.width

@@ -1,7 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
-import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, addLayer as engineAddLayer, requestRender } from '../engine/engineContext';
+import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, addLayer as engineAddLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
 
 const THUMB_SIZE = 40;
 
@@ -68,6 +68,65 @@ const LayerPanel: React.FC = () => {
   const setLayerVisibility = useLayerStore((s) => s.setLayerVisibility);
   const setLayerOpacity = useLayerStore((s) => s.setLayerOpacity);
   const setLayerLocked = useLayerStore((s) => s.setLayerLocked);
+  const reorderLayers = useLayerStore((s) => s.reorderLayers);
+
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  const handleDragStart = useCallback((e: React.DragEvent, layerId: string) => {
+    setDraggedId(layerId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', layerId);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, layerId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (layerId !== draggedId) {
+      setDropTargetId(layerId);
+    }
+  }, [draggedId]);
+
+  const handleDragLeave = useCallback(() => {
+    setDropTargetId(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetLayerId: string) => {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetLayerId) {
+      setDraggedId(null);
+      setDropTargetId(null);
+      return;
+    }
+
+    // The displayed list is reversed (top layer first in UI).
+    // reorderLayers expects the internal (bottom-to-top) order.
+    const currentIds = layers.map((l) => l.id);
+    const fromIndex = currentIds.indexOf(draggedId);
+    const toIndex = currentIds.indexOf(targetLayerId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    // Move in WASM first
+    engineMoveLayer(draggedId, targetLayerId);
+
+    // Reorder in store
+    const newIds = [...currentIds];
+    newIds.splice(fromIndex, 1);
+    newIds.splice(toIndex, 0, draggedId);
+    reorderLayers(newIds);
+
+    // Rebuild engine index map to match new order
+    rebuildLayerIndexMap(newIds);
+    requestRender();
+
+    setDraggedId(null);
+    setDropTargetId(null);
+  }, [draggedId, layers, reorderLayers]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedId(null);
+    setDropTargetId(null);
+  }, []);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
   const activeOpacity = activeLayer ? Math.round(activeLayer.opacity * 100) : 100;
@@ -107,12 +166,20 @@ const LayerPanel: React.FC = () => {
       <div className="layer-list" data-testid="layer-list">
         {[...layers].reverse().map((layer) => {
           const isActive = layer.id === activeLayerId;
+          const isDragged = layer.id === draggedId;
+          const isDropTarget = layer.id === dropTargetId;
           return (
             <div
               key={layer.id}
-              className={`layer-item${isActive ? ' active' : ''}`}
+              className={`layer-item${isActive ? ' active' : ''}${isDragged ? ' dragging' : ''}${isDropTarget ? ' drop-target' : ''}`}
               data-testid={`layer-item-${layer.id}`}
+              draggable
               onClick={() => setActiveLayer(layer.id)}
+              onDragStart={(e) => handleDragStart(e, layer.id)}
+              onDragOver={(e) => handleDragOver(e, layer.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, layer.id)}
+              onDragEnd={handleDragEnd}
             >
               <button
                 className="layer-visibility-btn"

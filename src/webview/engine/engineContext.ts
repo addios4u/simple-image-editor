@@ -228,6 +228,18 @@ export function setLayerVisible(layerId: string, visible: boolean): void {
   compositor.set_layer_visible(idx, visible);
 }
 
+export function moveLayer(fromLayerId: string, toLayerId: string): void {
+  const fromIdx = layerIndexMap.get(fromLayerId);
+  const toIdx = layerIndexMap.get(toLayerId);
+  if (fromIdx === undefined || toIdx === undefined || !compositor) return;
+  compositor.move_layer(fromIdx, toIdx);
+}
+
+export function rebuildLayerIndexMap(orderedLayerIds: string[]): void {
+  layerIndexMap.clear();
+  orderedLayerIds.forEach((id, i) => layerIndexMap.set(id, i));
+}
+
 // ---------------------------------------------------------------------------
 // Drawing operations (delegate to compositor layer methods)
 // ---------------------------------------------------------------------------

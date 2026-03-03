@@ -391,6 +391,14 @@ canvas {
   background: #2d5f8a;
 }
 
+.layer-item.dragging {
+  opacity: 0.4;
+}
+
+.layer-item.drop-target {
+  border-top: 2px solid #4a9eff;
+}
+
 .layer-visibility-btn {
   width: 20px;
   height: 20px;
