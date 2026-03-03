@@ -22,6 +22,7 @@ import {
 } from './wasmBridge';
 import { RenderLoop } from './renderLoop';
 import { readOra } from './openraster';
+import { initSelectionMask, destroySelectionMask } from './selectionMask';
 
 // ---------------------------------------------------------------------------
 // State
@@ -126,6 +127,10 @@ export function loadImage(
   }
 
   decoded.free();
+
+  // Initialize selection mask at the decoded image size.
+  initSelectionMask(w, h);
+
   return { width: w, height: h };
 }
 
@@ -183,6 +188,9 @@ export function loadOraData(oraBytes: Uint8Array): {
       visible: oraLayer.visible,
     });
   }
+
+  // Initialize selection mask at the ORA image size.
+  initSelectionMask(ora.width, ora.height);
 
   return { width: ora.width, height: ora.height, layers };
 }
@@ -563,4 +571,5 @@ export function destroy(): void {
   canvasWidth = 0;
   canvasHeight = 0;
   layerIndexMap.clear();
+  destroySelectionMask();
 }
