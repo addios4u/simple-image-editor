@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ZoomControls from './ZoomControls';
 import Minimap from './Minimap';
@@ -7,6 +7,8 @@ import { SelectionTool } from '../tools/SelectionTool';
 import { MarqueeTool } from '../tools/MarqueeTool';
 import { BrushTool } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
+import { setupCanvas, setupRenderLoop, compositeAndRender } from '../engine/engineContext';
+import { RenderLoop } from '../engine/renderLoop';
 
 function createTool(type: ToolType): BaseTool {
   switch (type) {
@@ -22,11 +24,16 @@ function createTool(type: ToolType): BaseTool {
   }
 }
 
-function toToolEvent(e: React.PointerEvent<HTMLCanvasElement>): ToolPointerEvent {
+function toToolEvent(
+  e: React.PointerEvent<HTMLCanvasElement>,
+  zoom: number,
+): ToolPointerEvent {
   const rect = e.currentTarget.getBoundingClientRect();
+  // getBoundingClientRect already reflects CSS transforms, so dividing
+  // by zoom converts the screen-pixel offset back to canvas pixels.
   return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+    x: (e.clientX - rect.left) / zoom,
+    y: (e.clientY - rect.top) / zoom,
     button: e.button,
     shiftKey: e.shiftKey,
     ctrlKey: e.ctrlKey,
@@ -48,6 +55,23 @@ const Canvas: React.FC = () => {
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
+  // Setup canvas 2D context and render loop on mount
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setupCanvas(ctx);
+    const loop = new RenderLoop(compositeAndRender);
+    setupRenderLoop(loop);
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, []);
+
   const tool = useMemo(() => {
     if (!toolRef.current || toolRef.current.type !== activeTool) {
       const instance = createTool(activeTool);
@@ -58,25 +82,25 @@ const Canvas: React.FC = () => {
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      tool.onPointerDown(toToolEvent(e));
+      tool.onPointerDown(toToolEvent(e, zoom));
     },
-    [tool],
+    [tool, zoom],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      const evt = toToolEvent(e);
+      const evt = toToolEvent(e, zoom);
       tool.onPointerMove(evt);
       setCursorPos({ x: Math.round(evt.x), y: Math.round(evt.y) });
     },
-    [tool],
+    [tool, zoom],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      tool.onPointerUp(toToolEvent(e));
+      tool.onPointerUp(toToolEvent(e, zoom));
     },
-    [tool],
+    [tool, zoom],
   );
 
   return (
