@@ -9,9 +9,7 @@ const EditorMode: React.FC = () => {
       <Toolbar />
       <div className="toolbar-divider" />
       <div className="editor-layout">
-        <div className="editor-canvas-area">
-          <Canvas />
-        </div>
+        <Canvas />
         <div className="sidebar-divider" />
         <SidebarTabs />
       </div>

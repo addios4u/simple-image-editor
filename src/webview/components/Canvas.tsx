@@ -1,6 +1,5 @@
 import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
-import ZoomControls from './ZoomControls';
 import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { SelectionTool } from '../tools/SelectionTool';
@@ -61,9 +60,6 @@ const Canvas: React.FC = () => {
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const zoom = useEditorStore((s) => s.zoom);
-  const panX = useEditorStore((s) => s.panX);
-  const panY = useEditorStore((s) => s.panY);
-  const setPan = useEditorStore((s) => s.setPan);
   const activeTool = useEditorStore((s) => s.activeTool);
   const selection = useEditorStore((s) => s.selection);
 
@@ -130,50 +126,59 @@ const Canvas: React.FC = () => {
   );
 
   return (
-    <div className="canvas-area-wrapper" ref={containerRef}>
-      <div className="canvas-container">
+    <div className="canvas-area-wrapper">
+      <div
+        ref={containerRef}
+        className="editor-canvas-area"
+      >
         <div
-          className="canvas-wrapper"
+          className="canvas-container"
           style={{
-            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
+            width: canvasWidth * zoom,
+            height: canvasHeight * zoom,
           }}
         >
-          <canvas
-            ref={canvasRef}
-            data-testid="editor-canvas"
-            width={canvasWidth}
-            height={canvasHeight}
-            style={{ cursor: tool.getCursor() }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          />
-          {selection && selection.width > 0 && selection.height > 0 && (
-            <div
-              data-testid="selection-overlay"
-              className="selection-overlay"
-              style={{
-                position: 'absolute',
-                left: selection.x,
-                top: selection.y,
-                width: selection.width,
-                height: selection.height,
-                border: '1px dashed #fff',
-                outline: '1px dashed #000',
-                pointerEvents: 'none',
-              }}
+          <div
+            className="canvas-wrapper"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            <canvas
+              ref={canvasRef}
+              data-testid="editor-canvas"
+              width={canvasWidth}
+              height={canvasHeight}
+              style={{ cursor: tool.getCursor() }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
             />
-          )}
+            {selection && selection.width > 0 && selection.height > 0 && (
+              <div
+                data-testid="selection-overlay"
+                className="selection-overlay"
+                style={{
+                  position: 'absolute',
+                  left: selection.x,
+                  top: selection.y,
+                  width: selection.width,
+                  height: selection.height,
+                  border: '1px dashed #fff',
+                  outline: '1px dashed #000',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </div>
         </div>
       </div>
       <Minimap
-        mode="transform"
+        mode="scroll"
         sourceCanvas={canvasRef.current}
         containerEl={containerRef.current}
         zoom={zoom}
-        panX={panX}
-        panY={panY}
-        setPan={setPan}
         docWidth={canvasWidth}
         docHeight={canvasHeight}
         cursorX={cursorPos.x}
