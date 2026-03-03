@@ -1,6 +1,63 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen, LockKeyhole, Move } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
+import { getLayerImageData } from '../engine/engineContext';
+
+const THUMB_SIZE = 40;
+
+const LayerThumbnail: React.FC<{ layerId: string }> = ({ layerId }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const imgData = getLayerImageData(layerId);
+    if (!imgData) {
+      // Draw checkerboard fallback
+      ctx.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+      const size = 5;
+      for (let y = 0; y < THUMB_SIZE; y += size) {
+        for (let x = 0; x < THUMB_SIZE; x += size) {
+          ctx.fillStyle = (Math.floor(x / size) + Math.floor(y / size)) % 2 === 0 ? '#555' : '#333';
+          ctx.fillRect(x, y, size, size);
+        }
+      }
+      return;
+    }
+
+    // Draw the full image scaled to thumbnail
+    const offscreen = document.createElement('canvas');
+    offscreen.width = imgData.width;
+    offscreen.height = imgData.height;
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) return;
+    offCtx.putImageData(imgData, 0, 0);
+
+    // Draw checkerboard background (for transparency)
+    const size = 5;
+    for (let y = 0; y < THUMB_SIZE; y += size) {
+      for (let x = 0; x < THUMB_SIZE; x += size) {
+        ctx.fillStyle = (Math.floor(x / size) + Math.floor(y / size)) % 2 === 0 ? '#555' : '#333';
+        ctx.fillRect(x, y, size, size);
+      }
+    }
+
+    // Draw scaled layer on top
+    ctx.drawImage(offscreen, 0, 0, THUMB_SIZE, THUMB_SIZE);
+  }, [layerId]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="layer-thumb-canvas"
+      width={THUMB_SIZE}
+      height={THUMB_SIZE}
+    />
+  );
+};
 
 const LayerPanel: React.FC = () => {
   const layers = useLayerStore((s) => s.layers);
@@ -76,7 +133,7 @@ const LayerPanel: React.FC = () => {
                   ? <Eye size={14} color={isActive ? '#ffffff' : '#969696'} />
                   : <EyeOff size={14} color="#969696" />}
               </button>
-              <div className="layer-thumb" />
+              <LayerThumbnail layerId={layer.id} />
               <div className="layer-info">
                 <span className={`layer-name${isActive ? ' active' : ''}`}>
                   {layer.name}

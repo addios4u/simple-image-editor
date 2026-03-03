@@ -447,6 +447,29 @@ export function compositeToBytes(format: string): Uint8Array {
 }
 
 /**
+ * Get raw RGBA pixel data for a layer as ImageData.
+ * Returns null if the layer or compositor is not available.
+ */
+export function getLayerImageData(layerId: string): ImageData | null {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !wasmMemory) return null;
+
+  const w = compositor.width();
+  const h = compositor.height();
+  if (w === 0 || h === 0) return null;
+
+  const layerPtr = compositor.get_layer_data_ptr(idx);
+  const layerLen = compositor.get_layer_data_len(idx);
+  if (!layerPtr || layerLen === 0) return null;
+
+  // Copy to standalone array to avoid detached buffer issues
+  const rgba = new Uint8ClampedArray(
+    new Uint8Array(new Uint8Array(wasmMemory.buffer, layerPtr, layerLen)),
+  );
+  return new ImageData(rgba, w, h);
+}
+
+/**
  * Encode a single layer to PNG bytes (for OpenRaster export).
  */
 export function encodeLayerToPng(layerId: string): Uint8Array {
