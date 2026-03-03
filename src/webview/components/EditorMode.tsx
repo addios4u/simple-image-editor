@@ -5,7 +5,7 @@ import SidebarTabs from './SidebarTabs';
 
 const EditorMode: React.FC = () => {
   return (
-    <>
+    <div className="editor-mode">
       <Toolbar />
       <div className="toolbar-divider" />
       <div className="editor-layout">
@@ -15,7 +15,7 @@ const EditorMode: React.FC = () => {
         <div className="sidebar-divider" />
         <SidebarTabs />
       </div>
-    </>
+    </div>
   );
 };
 

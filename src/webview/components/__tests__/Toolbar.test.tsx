@@ -26,7 +26,7 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: /marquee/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /brush/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /text/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /zoom/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^zoom$/i })).toBeInTheDocument();
   });
 
   it('active tool is highlighted', () => {
