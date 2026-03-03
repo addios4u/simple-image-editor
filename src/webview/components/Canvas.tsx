@@ -3,7 +3,7 @@ import { useEditorStore, type ToolType } from '../state/editorStore';
 import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { MoveTool } from '../tools/MoveTool';
-import { SelectionTool } from '../tools/SelectionTool';
+import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
 import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender, getCanvasSize } from '../engine/engineContext';
@@ -26,17 +26,22 @@ const brushConfig: BrushToolConfig = {
   requestRender,
 };
 
+const marqueeConfig: MarqueeToolConfig = {
+  setSelection: (rect) => useEditorStore.getState().setSelection(rect),
+};
+
 function createTool(type: ToolType): BaseTool {
   switch (type) {
     case 'move':
       return new MoveTool();
+    case 'select':
+      return new MarqueeTool(marqueeConfig);
     case 'brush':
       return new BrushTool(brushConfig);
     case 'text':
       return new TextTool();
-    case 'select':
     default:
-      return new SelectionTool();
+      return new MoveTool();
   }
 }
 

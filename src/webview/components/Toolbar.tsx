@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Minus, Plus, Move, MousePointer2, PenLine, Type, Download } from 'lucide-react';
+import { Minus, Plus, MousePointer2, BoxSelect, PenLine, Type, Download } from 'lucide-react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
 import { compositeToBytes } from '../engine/engineContext';
@@ -18,8 +18,8 @@ interface ToolDef {
 }
 
 const tools: ToolDef[] = [
-  { type: 'move', icon: <Move size={18} />, label: 'Move' },
-  { type: 'select', icon: <MousePointer2 size={18} />, label: 'Select' },
+  { type: 'move', icon: <MousePointer2 size={18} />, label: 'Move' },
+  { type: 'select', icon: <BoxSelect size={18} />, label: 'Select' },
   { type: 'brush', icon: <PenLine size={18} />, label: 'Brush' },
   { type: 'text', icon: <Type size={18} />, label: 'Text' },
 ];
