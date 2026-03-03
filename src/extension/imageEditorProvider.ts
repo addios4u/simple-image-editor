@@ -19,6 +19,12 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         reject: (err: Error) => void;
     }>();
 
+    /** Pending ORA data request callbacks. */
+    private readonly _pendingOraRequests = new Map<string, {
+        resolve: (result: { data: Uint8Array; layerCount: number }) => void;
+        reject: (err: Error) => void;
+    }>();
+
     private _nextRequestId = 1;
 
     constructor(context: vscode.ExtensionContext) {
@@ -44,7 +50,19 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         _token: vscode.CancellationToken
     ): Promise<ImageDocument> {
         const fileData = await vscode.workspace.fs.readFile(uri);
-        return new ImageDocument(uri, fileData);
+        const doc = new ImageDocument(uri, fileData);
+
+        // Check for ORA sidecar
+        const oraUri = vscode.Uri.file(uri.path + '.ora');
+        try {
+            await vscode.workspace.fs.stat(oraUri);
+            const oraData = await vscode.workspace.fs.readFile(oraUri);
+            doc.oraData = oraData;
+        } catch {
+            // No sidecar — that's fine
+        }
+
+        return doc;
     }
 
     public async resolveCustomEditor(
@@ -81,6 +99,10 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         const format = this._getFormatFromUri(document.uri);
         const data = await this._requestFileData(document, format);
         await vscode.workspace.fs.writeFile(document.uri, data);
+
+        // ORA sidecar: save or clean up
+        await this._saveOrDeleteOraSidecar(document);
+
         document.clearEdits();
     }
 
@@ -152,6 +174,43 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         });
     }
 
+    /**
+     * Request ORA data from the webview and save or delete the .ora sidecar.
+     */
+    private async _saveOrDeleteOraSidecar(document: ImageDocument): Promise<void> {
+        const panel = this._documentPanelMap.get(document);
+        if (!panel) return;
+
+        const requestId = `ora-${this._nextRequestId++}`;
+        const result = await new Promise<{ data: Uint8Array; layerCount: number }>((resolve, reject) => {
+            this._pendingOraRequests.set(requestId, { resolve, reject });
+            panel.webview.postMessage({
+                type: 'getOraData',
+                body: { requestId },
+            });
+            setTimeout(() => {
+                if (this._pendingOraRequests.has(requestId)) {
+                    this._pendingOraRequests.delete(requestId);
+                    reject(new Error('Timeout waiting for ORA data'));
+                }
+            }, 30000);
+        });
+
+        const oraUri = vscode.Uri.file(document.uri.path + '.ora');
+
+        if (result.layerCount > 1) {
+            await vscode.workspace.fs.writeFile(oraUri, result.data);
+        } else {
+            // Clean up stale sidecar
+            try {
+                await vscode.workspace.fs.stat(oraUri);
+                await vscode.workspace.fs.delete(oraUri);
+            } catch {
+                // No sidecar to delete
+            }
+        }
+    }
+
     /** Extract image format from a URI's file extension. */
     private _getFormatFromUri(uri: vscode.Uri): string {
         const ext = uri.path.split('.').pop()?.toLowerCase() ?? '';
@@ -180,13 +239,17 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
             case 'ready': {
                 const data = document.getData();
                 const fileName = document.uri.path.split('/').pop() ?? 'untitled';
+                const initBody: Record<string, unknown> = {
+                    data: Array.from(data),
+                    fileName,
+                    isUntitled: false,
+                };
+                if (document.oraData) {
+                    initBody.oraData = Array.from(document.oraData);
+                }
                 panel.webview.postMessage({
                     type: 'init',
-                    body: {
-                        data: Array.from(data),
-                        fileName,
-                        isUntitled: false,
-                    },
+                    body: initBody,
                 });
                 break;
             }
@@ -209,6 +272,15 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                     } else {
                         pending.resolve(new Uint8Array(data));
                     }
+                }
+                break;
+            }
+            case 'getOraDataResponse': {
+                const { requestId: oraReqId, data: oraData, layerCount } = message.body;
+                const oraPending = this._pendingOraRequests.get(oraReqId);
+                if (oraPending) {
+                    this._pendingOraRequests.delete(oraReqId);
+                    oraPending.resolve({ data: new Uint8Array(oraData), layerCount });
                 }
                 break;
             }

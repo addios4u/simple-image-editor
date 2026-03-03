@@ -4,12 +4,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
     mockReadFile,
     mockWriteFile,
+    mockStat,
+    mockDelete,
     mockRegisterCustomEditorProvider,
     mockOnDidReceiveMessage,
     mockPostMessage,
 } = vi.hoisted(() => ({
     mockReadFile: vi.fn(),
     mockWriteFile: vi.fn(),
+    mockStat: vi.fn(),
+    mockDelete: vi.fn(),
     mockRegisterCustomEditorProvider: vi.fn(),
     mockOnDidReceiveMessage: vi.fn(),
     mockPostMessage: vi.fn(),
@@ -25,6 +29,8 @@ vi.mock('vscode', () => ({
         fs: {
             readFile: mockReadFile,
             writeFile: mockWriteFile,
+            stat: mockStat,
+            delete: mockDelete,
         },
     },
     window: {
@@ -199,6 +205,13 @@ describe('ImageEditorProvider', () => {
                             body: { requestId: msg.body.requestId, data: responseData },
                         });
                     }, 0);
+                } else if (msg.type === 'getOraData') {
+                    setTimeout(() => {
+                        handler()({
+                            type: 'getOraDataResponse',
+                            body: { requestId: msg.body.requestId, data: [], layerCount: 1 },
+                        });
+                    }, 0);
                 }
                 return Promise.resolve(true);
             });
@@ -284,6 +297,147 @@ describe('ImageEditorProvider', () => {
                     type: 'getFileData',
                     body: expect.objectContaining({ format: 'jpeg' }),
                 })
+            );
+        });
+
+        it('should request ORA sidecar data and write .ora file when layerCount > 1', async () => {
+            const mockUri = { scheme: 'file', path: '/test/image.png', toString: () => 'file:///test/image.png' } as any;
+            const mockDocument = new ImageDocument(mockUri, new Uint8Array([1]));
+
+            const { panel, getHandler } = createPanelWithHandler();
+            await provider.resolveCustomEditor(
+                mockDocument, panel, { isCancellationRequested: false } as any
+            );
+
+            // Main file data response
+            const mainBytes = [0xAA, 0xBB];
+            // ORA data response (fake ZIP bytes)
+            const oraBytes = [0x50, 0x4B, 0x03, 0x04];
+
+            mockPostMessage.mockImplementation((msg: any) => {
+                if (msg.type === 'getFileData') {
+                    setTimeout(() => {
+                        getHandler()({
+                            type: 'getFileDataResponse',
+                            body: { requestId: msg.body.requestId, data: mainBytes },
+                        });
+                    }, 0);
+                } else if (msg.type === 'getOraData') {
+                    setTimeout(() => {
+                        getHandler()({
+                            type: 'getOraDataResponse',
+                            body: { requestId: msg.body.requestId, data: oraBytes, layerCount: 2 },
+                        });
+                    }, 0);
+                }
+                return Promise.resolve(true);
+            });
+            mockWriteFile.mockResolvedValue(undefined);
+
+            await provider.saveCustomDocument(
+                mockDocument, { isCancellationRequested: false } as any
+            );
+
+            // Main file written
+            expect(mockWriteFile).toHaveBeenCalledWith(mockUri, new Uint8Array(mainBytes));
+            // ORA sidecar written
+            expect(mockWriteFile).toHaveBeenCalledWith(
+                expect.objectContaining({ path: '/test/image.png.ora' }),
+                new Uint8Array(oraBytes),
+            );
+        });
+
+        it('should delete .ora sidecar when layerCount <= 1', async () => {
+            const mockUri = { scheme: 'file', path: '/test/image.png', toString: () => 'file:///test/image.png' } as any;
+            const mockDocument = new ImageDocument(mockUri, new Uint8Array([1]));
+
+            const { panel, getHandler } = createPanelWithHandler();
+            await provider.resolveCustomEditor(
+                mockDocument, panel, { isCancellationRequested: false } as any
+            );
+
+            mockPostMessage.mockImplementation((msg: any) => {
+                if (msg.type === 'getFileData') {
+                    setTimeout(() => {
+                        getHandler()({
+                            type: 'getFileDataResponse',
+                            body: { requestId: msg.body.requestId, data: [0xAA] },
+                        });
+                    }, 0);
+                } else if (msg.type === 'getOraData') {
+                    setTimeout(() => {
+                        getHandler()({
+                            type: 'getOraDataResponse',
+                            body: { requestId: msg.body.requestId, data: [], layerCount: 1 },
+                        });
+                    }, 0);
+                }
+                return Promise.resolve(true);
+            });
+            mockWriteFile.mockResolvedValue(undefined);
+            mockStat.mockResolvedValue({ type: 1 }); // file exists
+            mockDelete.mockResolvedValue(undefined);
+
+            await provider.saveCustomDocument(
+                mockDocument, { isCancellationRequested: false } as any
+            );
+
+            // ORA sidecar should be deleted
+            expect(mockDelete).toHaveBeenCalledWith(
+                expect.objectContaining({ path: '/test/image.png.ora' }),
+            );
+        });
+    });
+
+    describe('openCustomDocument with ORA sidecar', () => {
+        it('should include oraData in init when .ora sidecar exists', async () => {
+            const mockUri = { scheme: 'file', path: '/test/image.png', toString: () => 'file:///test/image.png' } as any;
+            const fileData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+            const oraData = new Uint8Array([0x50, 0x4B, 0x03, 0x04]);
+
+            mockReadFile.mockImplementation((uri: any) => {
+                if (uri.path.endsWith('.ora')) return Promise.resolve(oraData);
+                return Promise.resolve(fileData);
+            });
+            mockStat.mockResolvedValue({ type: 1 }); // .ora exists
+
+            const doc = await provider.openCustomDocument(
+                mockUri,
+                { backupId: undefined, untitledDocumentData: undefined } as any,
+                { isCancellationRequested: false } as any
+            );
+
+            // Set up panel so we can verify the init message
+            const mockWebviewPanel = {
+                webview: {
+                    options: {},
+                    html: '',
+                    onDidReceiveMessage: mockOnDidReceiveMessage,
+                    postMessage: mockPostMessage,
+                    asWebviewUri: (uri: any) => uri,
+                    cspSource: 'https://test.vscode-resource.com',
+                },
+                onDidDispose: vi.fn(),
+            } as any;
+            mockOnDidReceiveMessage.mockReturnValue({ dispose: vi.fn() });
+            mockWebviewPanel.onDidDispose.mockReturnValue({ dispose: vi.fn() });
+            mockPostMessage.mockResolvedValue(true);
+
+            await provider.resolveCustomEditor(
+                doc, mockWebviewPanel, { isCancellationRequested: false } as any
+            );
+
+            // Simulate 'ready' message to trigger init
+            const handler = mockOnDidReceiveMessage.mock.calls[0][0];
+            handler({ type: 'ready' });
+
+            expect(mockPostMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: 'init',
+                    body: expect.objectContaining({
+                        oraData: Array.from(oraData),
+                    }),
+                }),
             );
         });
     });

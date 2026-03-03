@@ -43,12 +43,20 @@ const mockInitEngine = vi.fn(async () => {});
 const mockLoadImage = vi.fn(() => ({ width: 640, height: 480 }));
 const mockRequestRender = vi.fn();
 const mockCompositeToBytes = vi.fn(() => new Uint8Array([0x89, 0x50]));
+const mockEncodeLayerToPng = vi.fn(() => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
 
 vi.mock('../engine/engineContext', () => ({
   initEngine: (...args: unknown[]) => mockInitEngine(...args),
   loadImage: (...args: unknown[]) => mockLoadImage(...args),
   requestRender: (...args: unknown[]) => mockRequestRender(...args),
   compositeToBytes: (...args: unknown[]) => mockCompositeToBytes(...args),
+  encodeLayerToPng: (...args: unknown[]) => mockEncodeLayerToPng(...args),
+}));
+
+// Mock openraster
+const mockWriteOra = vi.fn(() => new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
+vi.mock('../engine/openraster', () => ({
+  writeOra: (...args: unknown[]) => mockWriteOra(...args),
 }));
 
 // Mock WASM loader
@@ -212,6 +220,29 @@ describe('App', () => {
         },
       });
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('getOraData message', () => {
+    it('responds with ORA bytes and layer count', async () => {
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({
+          type: 'getOraData',
+          body: { requestId: 'ora-1' },
+        });
+      });
+
+      expect(mockWriteOra).toHaveBeenCalledTimes(1);
+      expect(mockPostMessage).toHaveBeenCalledWith({
+        type: 'getOraDataResponse',
+        body: {
+          requestId: 'ora-1',
+          data: Array.from(new Uint8Array([0x50, 0x4b, 0x03, 0x04])),
+          layerCount: 1,
+        },
+      });
     });
   });
 

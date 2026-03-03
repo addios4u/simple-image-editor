@@ -4,7 +4,9 @@ import ViewerMode from './components/ViewerMode';
 import EditorMode from './components/EditorMode';
 import vscodeApi from './vscode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { initEngine, loadImage, requestRender, compositeToBytes } from './engine/engineContext';
+import { initEngine, loadImage, requestRender, compositeToBytes, encodeLayerToPng } from './engine/engineContext';
+import { writeOra } from './engine/openraster';
+import { useLayerStore } from './state/layerStore';
 import { loadWasmModule } from './engine/loadWasm';
 import { useHistoryStore } from './state/historyStore';
 
@@ -16,6 +18,11 @@ interface InitMessage {
 interface GetFileDataMessage {
     type: 'getFileData';
     body: { requestId: string; format: string };
+}
+
+interface GetOraDataMessage {
+    type: 'getOraData';
+    body: { requestId: string };
 }
 
 const App: React.FC = () => {
@@ -71,6 +78,33 @@ const App: React.FC = () => {
                     vscodeApi.postMessage({
                         type: 'getFileDataResponse',
                         body: { requestId, data: [], error: String(err) },
+                    });
+                }
+            }
+
+            if (message?.type === 'getOraData') {
+                const { requestId } = (message as GetOraDataMessage).body;
+                try {
+                    const layers = useLayerStore.getState().layers;
+                    const { canvasWidth: cw, canvasHeight: ch } = useEditorStore.getState();
+                    const oraLayers = layers.map((l) => ({
+                        name: l.name,
+                        pngData: encodeLayerToPng(l.id),
+                        opacity: l.opacity,
+                        visible: l.visible,
+                    }));
+                    const mergedPng = compositeToBytes('png');
+                    const thumbnailPng = mergedPng; // reuse merged as thumbnail
+                    const oraBytes = writeOra(oraLayers, mergedPng, thumbnailPng, cw, ch);
+                    vscodeApi.postMessage({
+                        type: 'getOraDataResponse',
+                        body: { requestId, data: Array.from(oraBytes), layerCount: layers.length },
+                    });
+                } catch (err) {
+                    console.error('Failed to build ORA data:', err);
+                    vscodeApi.postMessage({
+                        type: 'getOraDataResponse',
+                        body: { requestId, data: [], layerCount: 0 },
                     });
                 }
             }

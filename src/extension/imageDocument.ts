@@ -5,6 +5,7 @@ export class ImageDocument implements vscode.CustomDocument {
     private readonly _uri: vscode.Uri;
     private _data: Uint8Array;
     private _edits: EditOperation[] = [];
+    public oraData: Uint8Array | null = null;
 
     constructor(uri: vscode.Uri, data: Uint8Array) {
         this._uri = uri;
