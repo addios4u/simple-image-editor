@@ -101,11 +101,13 @@ export function loadImage(
   layerIndexMap.set(layerId, idx);
 
   // Copy decoded pixels into the layer via set_layer_data.
+  // Must copy to a standalone Uint8Array first — set_layer_data internally
+  // allocates (malloc) which can grow WASM memory, detaching the old buffer.
   const ptr = decoded.data_ptr();
   const len = decoded.data_len();
   if (wasmMemory) {
-    const srcView = new Uint8Array(wasmMemory.buffer, ptr, len);
-    compositor.set_layer_data(idx, srcView);
+    const copy = new Uint8Array(new Uint8Array(wasmMemory.buffer, ptr, len));
+    compositor.set_layer_data(idx, copy);
   }
 
   decoded.free();
@@ -148,9 +150,11 @@ export function loadOraData(oraBytes: Uint8Array): {
     layerIndexMap.set(layerId, idx);
 
     // Copy decoded pixels into the compositor layer.
+    // Must copy to a standalone Uint8Array first — set_layer_data internally
+    // allocates (malloc) which can grow WASM memory, detaching the old buffer.
     if (wasmMemory) {
-      const src = new Uint8Array(wasmMemory.buffer, decoded.data_ptr(), decoded.data_len());
-      compositor.set_layer_data(idx, src);
+      const copy = new Uint8Array(new Uint8Array(wasmMemory.buffer, decoded.data_ptr(), decoded.data_len()));
+      compositor.set_layer_data(idx, copy);
     }
     decoded.free();
 
@@ -291,7 +295,8 @@ export function cutSelection(
   clipboard.cut(tmp, x, y, w, h);
 
   // Write back the cleared region to the layer.
-  const updated = new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len());
+  // Must copy to a standalone Uint8Array — set_layer_data can grow WASM memory.
+  const updated = new Uint8Array(new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len()));
   compositor.set_layer_data(idx, updated);
   tmp.free();
 }
@@ -323,7 +328,8 @@ export function pasteClipboard(
   clipboard.paste(tmp, x, y);
 
   // Write back pasted result to the layer.
-  const updated = new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len());
+  // Must copy to a standalone Uint8Array — set_layer_data can grow WASM memory.
+  const updated = new Uint8Array(new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len()));
   compositor.set_layer_data(idx, updated);
   tmp.free();
 }
