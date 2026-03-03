@@ -38,6 +38,21 @@ let canvasHeight = 0;
 /** Maps UI layer id → WASM compositor layer index. */
 const layerIndexMap = new Map<string, number>();
 
+/**
+ * Safely free the current compositor, tolerating corrupted borrow state.
+ * A previous WASM panic (e.g. detached ArrayBuffer) can leave the
+ * wasm-bindgen borrow counter in a bad state, making free() throw.
+ */
+function safeDisposeCompositor(): void {
+  if (!compositor) return;
+  try {
+    compositor.free();
+  } catch (e) {
+    console.warn('[engine] compositor.free() failed (likely corrupted borrow state):', e);
+  }
+  compositor = null;
+}
+
 // ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
@@ -90,7 +105,7 @@ export function loadImage(
   const h = decoded.height();
 
   // (Re-)create compositor at the decoded size.
-  compositor?.free();
+  safeDisposeCompositor();
   compositor = createLayerCompositor(w, h);
   canvasWidth = w;
   canvasHeight = h;
@@ -134,7 +149,7 @@ export function loadOraData(oraBytes: Uint8Array): {
   const ora = readOra(oraBytes);
 
   // (Re-)create compositor at ORA dimensions.
-  compositor?.free();
+  safeDisposeCompositor();
   compositor = createLayerCompositor(ora.width, ora.height);
   canvasWidth = ora.width;
   canvasHeight = ora.height;
@@ -493,8 +508,7 @@ export function isEngineReady(): boolean {
 export function destroy(): void {
   renderLoop?.stop();
   renderLoop = null;
-  compositor?.free();
-  compositor = null;
+  safeDisposeCompositor();
   clipboard?.free();
   clipboard = null;
   canvasCtx = null;
