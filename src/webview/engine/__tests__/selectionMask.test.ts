@@ -283,6 +283,86 @@ describe('SelectionMask', () => {
   });
 
   // -----------------------------------------------------------
+  // getPixel
+  // -----------------------------------------------------------
+
+  describe('getPixel', () => {
+    it('returns 0 for unselected pixel', () => {
+      expect(mask.getPixel(50, 50)).toBe(0);
+    });
+
+    it('returns 255 for selected pixel', () => {
+      mask.addRect(10, 10, 20, 20);
+      expect(mask.getPixel(15, 15)).toBe(255);
+    });
+
+    it('returns 0 for out-of-bounds coordinates', () => {
+      mask.addRect(0, 0, 100, 100);
+      expect(mask.getPixel(-1, 50)).toBe(0);
+      expect(mask.getPixel(100, 50)).toBe(0);
+      expect(mask.getPixel(50, -1)).toBe(0);
+      expect(mask.getPixel(50, 100)).toBe(0);
+    });
+  });
+
+  // -----------------------------------------------------------
+  // translate
+  // -----------------------------------------------------------
+
+  describe('translate', () => {
+    it('moves selection to the right and down', () => {
+      mask.addRect(10, 10, 20, 20);
+      mask.translate(5, 5);
+      expect(mask.getBounds()).toEqual({ x: 15, y: 15, width: 20, height: 20 });
+    });
+
+    it('moves selection to the left and up', () => {
+      mask.addRect(20, 20, 10, 10);
+      mask.translate(-5, -5);
+      expect(mask.getBounds()).toEqual({ x: 15, y: 15, width: 10, height: 10 });
+    });
+
+    it('clips pixels that move out of bounds', () => {
+      mask.addRect(0, 0, 10, 10);
+      mask.translate(-5, 0);
+      // Only x=0..4 remain (originally x=5..9 shifted left by 5)
+      expect(mask.getBounds()).toEqual({ x: 0, y: 0, width: 5, height: 10 });
+    });
+
+    it('clips pixels that move past right/bottom edge', () => {
+      mask.addRect(90, 90, 10, 10);
+      mask.translate(5, 5);
+      // Only (95..99, 95..99) remain
+      expect(mask.getBounds()).toEqual({ x: 95, y: 95, width: 5, height: 5 });
+    });
+
+    it('results in empty mask if fully moved out of bounds', () => {
+      mask.addRect(0, 0, 10, 10);
+      mask.translate(200, 0);
+      expect(mask.isEmpty()).toBe(true);
+      expect(mask.getBounds()).toBeNull();
+    });
+
+    it('zero translation does not change mask', () => {
+      mask.addRect(10, 10, 20, 20);
+      const before = mask.snapshot();
+      mask.translate(0, 0);
+      expect(mask.getMaskData()).toEqual(before);
+    });
+
+    it('preserves complex shapes (L-shape)', () => {
+      mask.addRect(0, 0, 30, 30);
+      mask.subtractRect(15, 0, 15, 15); // L-shape
+      mask.translate(10, 10);
+
+      // Original selected pixel (5, 20) → now at (15, 30)
+      expect(mask.getPixel(15, 30)).toBe(255);
+      // Original unselected pixel (20, 5) → now at (30, 15) — still unselected
+      expect(mask.getPixel(30, 15)).toBe(0);
+    });
+  });
+
+  // -----------------------------------------------------------
   // Module singleton
   // -----------------------------------------------------------
 

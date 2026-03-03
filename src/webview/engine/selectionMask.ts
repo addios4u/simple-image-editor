@@ -114,6 +114,49 @@ export class SelectionMask {
     this.intersectShape(x, y, w, h, true);
   }
 
+  // -- Point query ---------------------------------------------------------
+
+  /**
+   * Return the mask value at (x, y). Returns 0 for out-of-bounds coordinates.
+   */
+  getPixel(x: number, y: number): number {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    if (ix < 0 || ix >= this.w || iy < 0 || iy >= this.h) return 0;
+    return this.data[iy * this.w + ix];
+  }
+
+  // -- Translate -----------------------------------------------------------
+
+  /**
+   * Shift the entire mask by (dx, dy) pixels. Pixels that move out of
+   * bounds are clipped; vacated pixels become 0.
+   */
+  translate(dx: number, dy: number): void {
+    const idx = Math.round(dx);
+    const idy = Math.round(dy);
+    if (idx === 0 && idy === 0) return;
+
+    const newData = new Uint8Array(this.w * this.h);
+
+    for (let y = 0; y < this.h; y++) {
+      const srcRow = y * this.w;
+      const destY = y + idy;
+      if (destY < 0 || destY >= this.h) continue;
+      const destRow = destY * this.w;
+
+      for (let x = 0; x < this.w; x++) {
+        if (this.data[srcRow + x] === 0) continue;
+        const destX = x + idx;
+        if (destX < 0 || destX >= this.w) continue;
+        newData[destRow + destX] = this.data[srcRow + x];
+      }
+    }
+
+    this.data = newData;
+    this.invalidateBounds();
+  }
+
   // -- Snapshot / Restore --------------------------------------------------
 
   snapshot(): Uint8Array {
