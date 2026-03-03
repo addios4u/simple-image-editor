@@ -359,6 +359,107 @@ describe('MarqueeTool', () => {
   });
 
   // -----------------------------------------------------------
+  // Move mode — drag inside existing selection to move it
+  // -----------------------------------------------------------
+
+  describe('move mode (click inside selection)', () => {
+    it('clicking inside selected mask pixel enters move mode', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(20, 20, 60, 60);
+      const { config, mockSetSelection } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      // Click inside the selection (no modifier keys)
+      t.onPointerDown(ev(50, 50));
+      t.onPointerMove(ev(60, 60));
+      t.onPointerUp(ev(60, 60));
+
+      // Selection should have moved by (10, 10)
+      expect(mockSetSelection).toHaveBeenLastCalledWith({ x: 30, y: 30, width: 60, height: 60 });
+    });
+
+    it('clicking outside selection starts new replace selection', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(20, 20, 60, 60);
+      const { config } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      // Click outside the selection
+      t.onPointerDown(ev(5, 5));
+      t.onPointerUp(ev(15, 15));
+
+      // Should have replaced — old area cleared, new area selected
+      expect(mask.getPixel(50, 50)).toBe(0);  // old selection cleared
+      expect(mask.getPixel(10, 10)).toBe(255); // new selection
+    });
+
+    it('Shift + click inside selection does add mode, not move', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(20, 20, 60, 60);
+      const { config } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      // Shift+click inside → should be add mode, not move
+      t.onPointerDown(ev(50, 50, { shiftKey: true }));
+      t.onPointerUp(ev(70, 70, { shiftKey: true }));
+
+      // Original selection should still exist (add mode preserves it)
+      expect(mask.getPixel(30, 30)).toBe(255);
+    });
+
+    it('Alt + click inside selection does subtract mode, not move', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(20, 20, 60, 60);
+      const { config } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      // Alt+click inside → subtract mode
+      t.onPointerDown(ev(40, 40, { altKey: true }));
+      t.onPointerUp(ev(60, 60, { altKey: true }));
+
+      // Subtracted area should be cleared
+      expect(mask.getPixel(50, 50)).toBe(0);
+      // But surrounding area still selected
+      expect(mask.getPixel(25, 25)).toBe(255);
+    });
+
+    it('move mode preserves mask shape (L-shape moves intact)', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(10, 10, 50, 50);
+      mask.subtractRect(35, 10, 25, 25); // L-shape
+
+      const { config } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      // Click inside L-shape and drag right by 20
+      t.onPointerDown(ev(20, 40));
+      t.onPointerMove(ev(40, 40));
+      t.onPointerUp(ev(40, 40));
+
+      // Original hole should have moved too
+      expect(mask.getPixel(55, 20)).toBe(0); // was hole at (35,10)+20 offset
+      // Bottom-left of L should have moved
+      expect(mask.getPixel(40, 50)).toBe(255); // was (20,50)+20 offset
+    });
+
+    it('move mode with live preview updates contour on each move', () => {
+      const mask = new SelectionMask(MASK_W, MASK_H);
+      mask.addRect(20, 20, 40, 40);
+      const { config, mockOnContourChange } = makeConfig(mask);
+      const t = new MarqueeTool(config);
+
+      t.onPointerDown(ev(40, 40));
+      mockOnContourChange.mockClear();
+
+      t.onPointerMove(ev(50, 50));
+      expect(mockOnContourChange).toHaveBeenCalled();
+
+      t.onPointerMove(ev(60, 60));
+      expect(mockOnContourChange).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // -----------------------------------------------------------
   // Live preview restores snapshot each move
   // -----------------------------------------------------------
 

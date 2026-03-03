@@ -28,6 +28,8 @@ export class MarqueeTool extends BaseTool {
   private config: MarqueeToolConfig | undefined;
   private mode: SelectionMode = 'replace';
   private maskSnapshot: Uint8Array | null = null;
+  private isMoving = false;
+  private dragStart: Point | null = null;
 
   constructor(config?: MarqueeToolConfig) {
     super();
@@ -51,8 +53,18 @@ export class MarqueeTool extends BaseTool {
       this.mode = 'replace';
     }
 
-    // Snapshot mask state for live preview restore
+    // Move mode: no modifier keys + click inside existing mask pixel
     const mask = this.config?.getMask() ?? null;
+    if (this.mode === 'replace' && mask && mask.getPixel(Math.floor(e.x), Math.floor(e.y)) !== 0) {
+      this.isMoving = true;
+      this.isSelecting = true;
+      this.dragStart = { x: e.x, y: e.y };
+      this.maskSnapshot = mask.snapshot();
+      return;
+    }
+
+    // Normal selection mode
+    this.isMoving = false;
     this.maskSnapshot = mask ? mask.snapshot() : null;
 
     this.isSelecting = true;
@@ -61,13 +73,31 @@ export class MarqueeTool extends BaseTool {
   }
 
   onPointerMove(e: PointerEvent): void {
-    if (!this.isSelecting || !this.startPoint) return;
+    if (!this.isSelecting) return;
+
+    if (this.isMoving) {
+      this.moveToMask(e);
+      return;
+    }
+
+    if (!this.startPoint) return;
     this.updateRect(e);
     this.applyToMask();
   }
 
   onPointerUp(e: PointerEvent): void {
-    if (!this.isSelecting || !this.startPoint) return;
+    if (!this.isSelecting) return;
+
+    if (this.isMoving) {
+      this.moveToMask(e);
+      this.isSelecting = false;
+      this.isMoving = false;
+      this.dragStart = null;
+      this.maskSnapshot = null;
+      return;
+    }
+
+    if (!this.startPoint) return;
     this.updateRect(e);
     this.isSelecting = false;
     this.applyToMask();
@@ -162,6 +192,31 @@ export class MarqueeTool extends BaseTool {
     this.selectionRect = bounds;
 
     // Update contour for rendering
+    const contour = mask.isEmpty()
+      ? null
+      : extractContour(mask.getMaskData(), mask.getWidth(), mask.getHeight());
+    this.config.onContourChange(contour);
+  }
+
+  /**
+   * Move the mask by the drag delta from dragStart, updating store and contour.
+   */
+  private moveToMask(e: PointerEvent): void {
+    if (!this.config || !this.dragStart) return;
+
+    const mask = this.config.getMask();
+    if (!mask || !this.maskSnapshot) return;
+
+    const dx = Math.round(e.x - this.dragStart.x);
+    const dy = Math.round(e.y - this.dragStart.y);
+
+    mask.restore(this.maskSnapshot);
+    mask.translate(dx, dy);
+
+    const bounds = mask.getBounds();
+    this.config.setSelection(bounds);
+    this.selectionRect = bounds;
+
     const contour = mask.isEmpty()
       ? null
       : extractContour(mask.getMaskData(), mask.getWidth(), mask.getHeight());
