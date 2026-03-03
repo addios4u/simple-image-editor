@@ -7,7 +7,7 @@ import { SelectionTool } from '../tools/SelectionTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
-import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender } from '../engine/engineContext';
+import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender, getCanvasSize } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
@@ -83,6 +83,14 @@ const Canvas: React.FC = () => {
     const loop = new RenderLoop(compositeAndRender);
     setupRenderLoop(loop);
     loop.start();
+
+    // Sync canvas dimensions from engine in case the store wasn't updated
+    // (e.g. a prior loadImage error prevented setCanvasSize from running).
+    const engineSize = getCanvasSize();
+    if (engineSize.width > 0 && engineSize.height > 0) {
+      useEditorStore.getState().setCanvasSize(engineSize.width, engineSize.height);
+    }
+
     requestRender();
 
     return () => {

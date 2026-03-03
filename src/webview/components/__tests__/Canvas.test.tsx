@@ -14,6 +14,7 @@ vi.mock('../../engine/engineContext', () => ({
   compositeAndRender: (...args: unknown[]) => mockCompositeAndRender(...args),
   brushStrokeLayer: vi.fn(),
   requestRender: vi.fn(),
+  getCanvasSize: vi.fn(() => ({ width: 0, height: 0 })),
 }));
 
 vi.mock('../../engine/helpers', () => ({
