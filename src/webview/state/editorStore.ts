@@ -28,6 +28,7 @@ interface EditorState {
   strokeWidth: number;
   selection: SelectionRect | null;
   selectionShape: SelectionShape;
+  selectionVersion: number;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -40,6 +41,7 @@ interface EditorState {
   setImageData: (data: Uint8Array, fileName: string) => void;
   setStrokeWidth: (width: number) => void;
   setSelection: (sel: SelectionRect | null) => void;
+  bumpSelectionVersion: () => void;
   toggleSelectionShape: () => void;
 }
 
@@ -59,6 +61,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   strokeWidth: 5,
   selection: null,
   selectionShape: 'rectangle',
+  selectionVersion: 0,
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -69,7 +72,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   setImageData: (data, fileName) => set({ imageData: data, fileName }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
-  setSelection: (sel) => set({ selection: sel }),
+  setSelection: (sel) => set((state) => ({ selection: sel, selectionVersion: state.selectionVersion + 1 })),
+  bumpSelectionVersion: () => set((state) => ({ selectionVersion: state.selectionVersion + 1 })),
   toggleSelectionShape: () =>
     set((state) => ({
       selectionShape: state.selectionShape === 'rectangle' ? 'ellipse' : 'rectangle',

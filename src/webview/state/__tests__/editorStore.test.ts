@@ -108,5 +108,19 @@ describe('editorStore', () => {
       useEditorStore.getState().setSelection(null);
       expect(useEditorStore.getState().selection).toBeNull();
     });
+
+    it('setSelection bumps selectionVersion', () => {
+      const v0 = useEditorStore.getState().selectionVersion;
+      useEditorStore.getState().setSelection({ x: 0, y: 0, width: 10, height: 10 });
+      expect(useEditorStore.getState().selectionVersion).toBe(v0 + 1);
+      useEditorStore.getState().setSelection(null);
+      expect(useEditorStore.getState().selectionVersion).toBe(v0 + 2);
+    });
+
+    it('bumpSelectionVersion increments counter', () => {
+      const v0 = useEditorStore.getState().selectionVersion;
+      useEditorStore.getState().bumpSelectionVersion();
+      expect(useEditorStore.getState().selectionVersion).toBe(v0 + 1);
+    });
   });
 });
