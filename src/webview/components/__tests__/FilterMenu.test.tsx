@@ -10,11 +10,11 @@ const mockRequestRender = vi.fn();
 const mockCaptureLayerRegion = vi.fn(() => ({ free: vi.fn() }));
 
 vi.mock('../../engine/engineContext', () => ({
-  gaussianBlurLayer: (...args: unknown[]) => mockGaussianBlurLayer(...args),
-  boxBlurLayer: (...args: unknown[]) => mockBoxBlurLayer(...args),
-  motionBlurLayer: (...args: unknown[]) => mockMotionBlurLayer(...args),
-  requestRender: (...args: unknown[]) => mockRequestRender(...args),
-  captureLayerRegion: (...args: unknown[]) => mockCaptureLayerRegion(...args),
+  gaussianBlurLayer: (...args: any[]) => mockGaussianBlurLayer(...args),
+  boxBlurLayer: (...args: any[]) => mockBoxBlurLayer(...args),
+  motionBlurLayer: (...args: any[]) => mockMotionBlurLayer(...args),
+  requestRender: (...args: any[]) => mockRequestRender(...args),
+  captureLayerRegion: (...args: any[]) => mockCaptureLayerRegion(...args),
 }));
 
 // Mock historyStore

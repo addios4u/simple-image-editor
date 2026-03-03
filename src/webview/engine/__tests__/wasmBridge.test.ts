@@ -47,12 +47,24 @@ function createMockModule(): WasmModule {
   };
 
   const mockCompositor: WasmLayerCompositor = {
+    width: vi.fn(() => 10),
+    height: vi.fn(() => 10),
     add_layer: vi.fn(() => 0),
     layer_count: vi.fn(() => 1),
     set_layer_opacity: vi.fn(),
     set_layer_visible: vi.fn(),
     remove_layer: vi.fn(() => true),
     composite: vi.fn(() => mockPixelBuffer),
+    brush_stroke_layer: vi.fn(),
+    fill_rect_layer: vi.fn(),
+    get_layer_data_ptr: vi.fn(() => 0),
+    get_layer_data_len: vi.fn(() => 400),
+    set_layer_data: vi.fn(),
+    box_blur_layer: vi.fn(),
+    gaussian_blur_layer: vi.fn(),
+    motion_blur_layer: vi.fn(),
+    capture_layer_region: vi.fn(() => mockSnapshot),
+    restore_layer_region: vi.fn(),
     free: vi.fn(),
   };
 
@@ -65,6 +77,7 @@ function createMockModule(): WasmModule {
   };
 
   return {
+    memory: {} as WebAssembly.Memory,
     init: vi.fn(),
     PixelBuffer: vi.fn(() => mockPixelBuffer) as unknown as WasmModule['PixelBuffer'],
     decode_image: vi.fn(() => mockPixelBuffer),
