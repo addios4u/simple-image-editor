@@ -77,7 +77,7 @@ describe('LayerPanel', () => {
     expect(state.layers).toHaveLength(2);
   });
 
-  it('Delete Layer button removes selected layer', () => {
+  it('trash button removes the layer', () => {
     useLayerStore.setState({
       layers: [
         { id: 'layer-1', name: 'Background', visible: true, opacity: 1 },
@@ -87,7 +87,7 @@ describe('LayerPanel', () => {
     });
 
     render(<LayerPanel />);
-    const deleteBtn = screen.getByRole('button', { name: /delete layer/i });
+    const deleteBtn = screen.getByTestId('delete-layer-layer-2');
 
     fireEvent.click(deleteBtn);
 
@@ -96,11 +96,11 @@ describe('LayerPanel', () => {
     expect(state.layers[0].id).toBe('layer-1');
   });
 
-  it('opacity slider changes layer opacity', () => {
+  it('opacity input changes active layer opacity', () => {
     render(<LayerPanel />);
-    const slider = screen.getByTestId('opacity-slider-layer-1');
+    const input = screen.getByTestId('layer-opacity-input');
 
-    fireEvent.change(slider, { target: { value: '0.5' } });
+    fireEvent.change(input, { target: { value: '50' } });
 
     expect(useLayerStore.getState().layers[0].opacity).toBe(0.5);
   });
