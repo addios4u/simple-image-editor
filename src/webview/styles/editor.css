@@ -454,6 +454,20 @@ canvas {
   flex-shrink: 0;
 }
 
+.layer-lock-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.layer-lock-btn:hover {
+  opacity: 0.8;
+}
+
 .layer-delete-btn {
   border: none;
   background: transparent;
