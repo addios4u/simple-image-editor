@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Minus, Plus, MousePointer2, BoxSelect, PenLine, Type, Search } from 'lucide-react';
+import { Minus, Plus, Move, MousePointer2, PenLine, Type, Download } from 'lucide-react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
+import { compositeToBytes } from '../engine/engineContext';
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -17,11 +18,10 @@ interface ToolDef {
 }
 
 const tools: ToolDef[] = [
+  { type: 'move', icon: <Move size={18} />, label: 'Move' },
   { type: 'select', icon: <MousePointer2 size={18} />, label: 'Select' },
-  { type: 'marquee', icon: <BoxSelect size={18} />, label: 'Marquee' },
   { type: 'brush', icon: <PenLine size={18} />, label: 'Brush' },
   { type: 'text', icon: <Type size={18} />, label: 'Text' },
-  { type: 'zoom', icon: <Search size={18} />, label: 'Zoom' },
 ];
 
 const Toolbar: React.FC = () => {
@@ -48,6 +48,21 @@ const Toolbar: React.FC = () => {
       setFillColor(result.sRGBHex);
     } catch { /* cancelled */ }
   }, [setFillColor]);
+
+  const handleExport = useCallback(() => {
+    try {
+      const bytes = compositeToBytes('png');
+      const blob = new Blob([bytes], { type: 'image/png' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (fileName || 'untitled').replace(/\.[^.]+$/, '') + '.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  }, [fileName]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -100,6 +115,13 @@ const Toolbar: React.FC = () => {
           {tool.icon}
         </button>
       ))}
+      <button
+        className="toolbar-btn"
+        onClick={handleExport}
+        title="Export"
+      >
+        <Download size={18} />
+      </button>
       <div className="toolbar-separator" />
       <span className="toolbar-file-label">
         {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}

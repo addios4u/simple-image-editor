@@ -92,16 +92,16 @@ describe('useKeyboardShortcuts', () => {
   // ---------------------------------------------------------------
 
   describe('Tool shortcuts', () => {
-    it('V key switches to select tool', () => {
+    it('V key switches to move tool', () => {
       renderHook(() => useKeyboardShortcuts());
       fireKey('v');
-      expect(useEditorStore.getState().activeTool).toBe('select');
+      expect(useEditorStore.getState().activeTool).toBe('move');
     });
 
-    it('M key switches to marquee tool', () => {
+    it('S key switches to select tool', () => {
       renderHook(() => useKeyboardShortcuts());
-      fireKey('m');
-      expect(useEditorStore.getState().activeTool).toBe('marquee');
+      fireKey('s');
+      expect(useEditorStore.getState().activeTool).toBe('select');
     });
 
     it('B key switches to brush tool', () => {
@@ -114,12 +114,6 @@ describe('useKeyboardShortcuts', () => {
       renderHook(() => useKeyboardShortcuts());
       fireKey('t');
       expect(useEditorStore.getState().activeTool).toBe('text');
-    });
-
-    it('Z key (without modifier) switches to zoom tool', () => {
-      renderHook(() => useKeyboardShortcuts());
-      fireKey('z');
-      expect(useEditorStore.getState().activeTool).toBe('zoom');
     });
 
     it('tool shortcuts are ignored when modifier is held', () => {

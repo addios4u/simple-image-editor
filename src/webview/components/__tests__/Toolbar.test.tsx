@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import Toolbar from '../Toolbar';
 import { useEditorStore } from '../../state/editorStore';
+
+vi.mock('../../engine/engineContext', () => ({
+  compositeToBytes: vi.fn(() => new Uint8Array([0])),
+}));
 
 describe('Toolbar', () => {
   beforeEach(() => {
@@ -22,11 +26,11 @@ describe('Toolbar', () => {
 
   it('renders tool buttons for all tools', () => {
     render(<Toolbar />);
+    expect(screen.getByRole('button', { name: /move/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /select/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /marquee/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /brush/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /text/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^zoom$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument();
   });
 
   it('active tool is highlighted', () => {
@@ -38,9 +42,9 @@ describe('Toolbar', () => {
 
   it('clicking a tool button changes active tool', () => {
     render(<Toolbar />);
-    const marqueeButton = screen.getByRole('button', { name: /marquee/i });
+    const moveButton = screen.getByRole('button', { name: /move/i });
 
-    fireEvent.click(marqueeButton);
-    expect(useEditorStore.getState().activeTool).toBe('marquee');
+    fireEvent.click(moveButton);
+    expect(useEditorStore.getState().activeTool).toBe('move');
   });
 });

@@ -38,7 +38,7 @@ describe('editorStore', () => {
 
   it('setActiveTool changes tool', () => {
     const { setActiveTool } = useEditorStore.getState();
-    const tools = ['select', 'marquee', 'brush', 'text', 'zoom'] as const;
+    const tools = ['move', 'select', 'brush', 'text'] as const;
 
     for (const tool of tools) {
       setActiveTool(tool);

@@ -6,11 +6,10 @@ import { fillRectLayer, requestRender, copySelection, cutSelection, pasteClipboa
 import { hexToPackedRGBA } from '../engine/helpers';
 
 const TOOL_KEYS: Record<string, ToolType> = {
-  v: 'select',
-  m: 'marquee',
+  v: 'move',
+  s: 'select',
   b: 'brush',
   t: 'text',
-  z: 'zoom',
 };
 
 export function useKeyboardShortcuts(): void {

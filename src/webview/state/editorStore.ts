@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export type EditorMode = 'viewer' | 'editor';
-export type ToolType = 'select' | 'marquee' | 'brush' | 'text' | 'zoom';
+export type ToolType = 'move' | 'select' | 'brush' | 'text';
 export type SidebarTab = 'layers' | 'properties' | 'ai';
 
 export interface SelectionRect {
