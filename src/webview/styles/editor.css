@@ -1065,3 +1065,23 @@ canvas {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* --- Marching Ants Selection --- */
+
+.marching-ants {
+  border: none;
+  outline: none;
+  background:
+    repeating-linear-gradient(0deg, #000 0, #000 4px, #fff 4px, #fff 8px) 0 0 / 1px 100%,
+    repeating-linear-gradient(90deg, #000 0, #000 4px, #fff 4px, #fff 8px) 0 0 / 100% 1px,
+    repeating-linear-gradient(0deg, #000 0, #000 4px, #fff 4px, #fff 8px) 100% 0 / 1px 100%,
+    repeating-linear-gradient(90deg, #000 0, #000 4px, #fff 4px, #fff 8px) 0 100% / 100% 1px;
+  background-repeat: no-repeat;
+  animation: marching-ants 400ms linear infinite;
+}
+
+@keyframes marching-ants {
+  to {
+    background-position: 0 -8px, 8px 0, 100% 8px, -8px 100%;
+  }
+}
