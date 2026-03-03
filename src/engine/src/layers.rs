@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 use crate::canvas::PixelBuffer;
+use crate::history::RegionSnapshot;
 
 /// Blend mode for layer compositing.
 #[wasm_bindgen]
@@ -73,6 +74,123 @@ impl LayerCompositor {
             true
         } else {
             false
+        }
+    }
+
+    /// Get the width of the compositor canvas.
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// Get the height of the compositor canvas.
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// Apply a brush stroke directly to a layer's buffer.
+    pub fn brush_stroke_layer(
+        &mut self,
+        index: usize,
+        cx: f32,
+        cy: f32,
+        color: u32,
+        size: f32,
+        hardness: f32,
+    ) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::brush::brush_stroke(&mut layer.buffer, cx, cy, color, size, hardness);
+        }
+    }
+
+    /// Fill a rectangular region on a layer's buffer.
+    pub fn fill_rect_layer(
+        &mut self,
+        index: usize,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        rgba: u32,
+    ) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            layer.buffer.fill_rect(x, y, w, h, rgba);
+        }
+    }
+
+    /// Get the pointer to a layer's pixel data for zero-copy rendering.
+    /// Returns 0 if the index is invalid.
+    pub fn get_layer_data_ptr(&self, index: usize) -> *const u8 {
+        self.layers
+            .get(index)
+            .map(|l| l.buffer.data_ptr())
+            .unwrap_or(std::ptr::null())
+    }
+
+    /// Get the byte length of a layer's pixel data.
+    /// Returns 0 if the index is invalid.
+    pub fn get_layer_data_len(&self, index: usize) -> u32 {
+        self.layers
+            .get(index)
+            .map(|l| l.buffer.data_len())
+            .unwrap_or(0)
+    }
+
+    /// Copy raw pixel data from JS into a layer's buffer.
+    /// Data must be exactly width*height*4 bytes.
+    pub fn set_layer_data(&mut self, index: usize, data: &[u8]) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            let buf = layer.buffer.raw_data_mut();
+            if data.len() == buf.len() {
+                buf.copy_from_slice(data);
+            }
+        }
+    }
+
+    /// Apply box blur to a specific layer.
+    pub fn box_blur_layer(&mut self, index: usize, radius: u32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::filters::box_blur(&mut layer.buffer, radius);
+        }
+    }
+
+    /// Apply gaussian blur to a specific layer.
+    pub fn gaussian_blur_layer(&mut self, index: usize, sigma: f32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::filters::gaussian_blur(&mut layer.buffer, sigma);
+        }
+    }
+
+    /// Apply motion blur to a specific layer.
+    pub fn motion_blur_layer(&mut self, index: usize, angle: f32, distance: u32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::filters::motion_blur(&mut layer.buffer, angle, distance);
+        }
+    }
+
+    /// Capture a rectangular region snapshot from a layer for undo/redo.
+    /// Returns a snapshot of a 0x0 region if the index is invalid.
+    pub fn capture_layer_region(
+        &self,
+        index: usize,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+    ) -> RegionSnapshot {
+        if let Some(layer) = self.layers.get(index) {
+            crate::history::capture_region(&layer.buffer, x, y, w, h)
+        } else {
+            crate::history::capture_region(
+                &PixelBuffer::new(0, 0),
+                0, 0, 0, 0,
+            )
+        }
+    }
+
+    /// Restore a previously captured region snapshot onto a layer.
+    pub fn restore_layer_region(&mut self, index: usize, snapshot: &RegionSnapshot) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::history::restore_region(&mut layer.buffer, snapshot);
         }
     }
 

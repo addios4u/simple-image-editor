@@ -132,3 +132,200 @@ fn test_remove_layer() {
     // Removing out-of-bounds index returns false.
     assert!(!comp.remove_layer(5));
 }
+
+// --- Phase A-1: Layer access method tests ---
+
+#[test]
+fn test_brush_stroke_layer() {
+    let mut comp = LayerCompositor::new(10, 10);
+    let idx = comp.add_layer();
+
+    // Apply red brush stroke at center
+    let red: u32 = 0xFF0000FF;
+    comp.brush_stroke_layer(idx, 5.0, 5.0, red, 4.0, 1.0);
+
+    // Center pixel should have red color
+    let pixel = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(5, 5);
+    let r = (pixel >> 24) & 0xFF;
+    let a = pixel & 0xFF;
+    assert!(r > 200, "red channel should be high, got {}", r);
+    assert!(a > 200, "alpha should be high, got {}", a);
+}
+
+#[test]
+fn test_brush_stroke_layer_invalid_index() {
+    let mut comp = LayerCompositor::new(10, 10);
+    // Should not panic on invalid index
+    comp.brush_stroke_layer(99, 5.0, 5.0, 0xFF0000FF, 4.0, 1.0);
+}
+
+#[test]
+fn test_fill_rect_layer() {
+    let mut comp = LayerCompositor::new(8, 8);
+    let idx = comp.add_layer();
+
+    let blue: u32 = 0x0000FFFF;
+    comp.fill_rect_layer(idx, 2, 2, 4, 4, blue);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    // Inside fill region
+    let pixel = buf.get_pixel(3, 3);
+    assert_eq!(pixel, blue);
+    // Outside fill region
+    let pixel_outside = buf.get_pixel(0, 0);
+    assert_eq!(pixel_outside, 0);
+}
+
+#[test]
+fn test_fill_rect_layer_invalid_index() {
+    let mut comp = LayerCompositor::new(8, 8);
+    comp.fill_rect_layer(99, 0, 0, 4, 4, 0xFF0000FF);
+}
+
+#[test]
+fn test_get_layer_data_ptr_and_len() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+
+    let ptr = comp.get_layer_data_ptr(idx);
+    let len = comp.get_layer_data_len(idx);
+
+    assert!(!ptr.is_null());
+    assert_eq!(len, 4 * 4 * 4); // 4x4 pixels * 4 bytes
+}
+
+#[test]
+fn test_get_layer_data_ptr_invalid_index() {
+    let comp = LayerCompositor::new(4, 4);
+    assert!(comp.get_layer_data_ptr(99).is_null());
+    assert_eq!(comp.get_layer_data_len(99), 0);
+}
+
+#[test]
+fn test_set_layer_data() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let idx = comp.add_layer();
+
+    // Create data: all pixels are green
+    let mut data = vec![0u8; 2 * 2 * 4];
+    for i in 0..4 {
+        let base = i * 4;
+        data[base] = 0;     // R
+        data[base + 1] = 255; // G
+        data[base + 2] = 0;   // B
+        data[base + 3] = 255; // A
+    }
+
+    comp.set_layer_data(idx, &data);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    let pixel = buf.get_pixel(0, 0);
+    assert_eq!(pixel, 0x00FF00FF); // Green, fully opaque
+}
+
+#[test]
+fn test_set_layer_data_wrong_size_ignored() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let idx = comp.add_layer();
+
+    // Wrong size data should be ignored
+    let data = vec![0xFFu8; 10]; // not 2*2*4 = 16
+    comp.set_layer_data(idx, &data);
+
+    // Buffer should remain all zeros
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(0, 0), 0);
+}
+
+#[test]
+fn test_box_blur_layer() {
+    let mut comp = LayerCompositor::new(8, 8);
+    let idx = comp.add_layer();
+
+    // Set a single bright pixel
+    comp.get_layer_buffer_mut(idx).unwrap()
+        .set_pixel(4, 4, 0xFFFFFFFF);
+
+    comp.box_blur_layer(idx, 1);
+
+    // After blur the center pixel should be dimmer (spread to neighbors)
+    let pixel = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(4, 4);
+    let r = (pixel >> 24) & 0xFF;
+    assert!(r < 255, "center should be dimmer after blur, got r={}", r);
+    assert!(r > 0, "center should still have some value, got r={}", r);
+}
+
+#[test]
+fn test_gaussian_blur_layer() {
+    let mut comp = LayerCompositor::new(8, 8);
+    let idx = comp.add_layer();
+
+    comp.get_layer_buffer_mut(idx).unwrap()
+        .set_pixel(4, 4, 0xFFFFFFFF);
+
+    comp.gaussian_blur_layer(idx, 1.0);
+
+    let pixel = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(4, 4);
+    let r = (pixel >> 24) & 0xFF;
+    assert!(r < 255, "center should be dimmer after gaussian blur");
+    assert!(r > 0, "center should still have some value");
+}
+
+#[test]
+fn test_motion_blur_layer() {
+    let mut comp = LayerCompositor::new(8, 8);
+    let idx = comp.add_layer();
+
+    // Fill a column for visible motion blur effect
+    for y in 0..8 {
+        comp.get_layer_buffer_mut(idx).unwrap()
+            .set_pixel(4, y, 0xFFFFFFFF);
+    }
+
+    comp.motion_blur_layer(idx, 0.0, 2); // horizontal
+
+    // Pixel next to the column should now have some color from the blur
+    let pixel = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(3, 4);
+    let r = (pixel >> 24) & 0xFF;
+    assert!(r > 0, "neighboring pixel should have blur spillover, got r={}", r);
+}
+
+#[test]
+fn test_capture_and_restore_layer_region() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+
+    // Fill with red
+    comp.fill_rect_layer(idx, 0, 0, 4, 4, 0xFF0000FF);
+
+    // Capture snapshot
+    let snapshot = comp.capture_layer_region(idx, 0, 0, 4, 4);
+    assert_eq!(snapshot.width(), 4);
+    assert_eq!(snapshot.height(), 4);
+
+    // Overwrite with blue
+    comp.fill_rect_layer(idx, 0, 0, 4, 4, 0x0000FFFF);
+    let pixel_after = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(0, 0);
+    assert_eq!(pixel_after, 0x0000FFFF);
+
+    // Restore snapshot (should be red again)
+    comp.restore_layer_region(idx, &snapshot);
+    let pixel_restored = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(0, 0);
+    assert_eq!(pixel_restored, 0xFF0000FF);
+}
+
+#[test]
+fn test_capture_layer_region_invalid_index() {
+    let comp = LayerCompositor::new(4, 4);
+    // Should not panic, returns empty snapshot
+    let snapshot = comp.capture_layer_region(99, 0, 0, 4, 4);
+    assert_eq!(snapshot.width(), 0);
+    assert_eq!(snapshot.height(), 0);
+}
+
+#[test]
+fn test_width_and_height() {
+    let comp = LayerCompositor::new(100, 200);
+    assert_eq!(comp.width(), 100);
+    assert_eq!(comp.height(), 200);
+}
