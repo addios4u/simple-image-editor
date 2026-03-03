@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useEditorStore } from '../state/editorStore';
+import { useLayerStore } from '../state/layerStore';
+import { fillRectLayer, requestRender } from '../engine/engineContext';
+import { hexToPackedRGBA } from '../engine/helpers';
 
 const PropertyPanel: React.FC = () => {
   const fillColor = useEditorStore((s) => s.fillColor);
@@ -7,6 +10,15 @@ const PropertyPanel: React.FC = () => {
   const setFillColor = useEditorStore((s) => s.setFillColor);
   const setStrokeColor = useEditorStore((s) => s.setStrokeColor);
   const [strokeWidth, setStrokeWidth] = useState(1);
+
+  const handleFill = useCallback(() => {
+    const { selection, canvasWidth, canvasHeight, fillColor: color } = useEditorStore.getState();
+    const { activeLayerId } = useLayerStore.getState();
+    const rgba = hexToPackedRGBA(color);
+    const rect = selection ?? { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+    fillRectLayer(activeLayerId, rect.x, rect.y, rect.width, rect.height, rgba);
+    requestRender();
+  }, []);
 
   return (
     <div className="sidebar-section" data-testid="property-panel">
@@ -25,7 +37,7 @@ const PropertyPanel: React.FC = () => {
             }
             aria-label="Fill color"
           />
-          <button className="toolbar-btn" aria-label="Fill">
+          <button className="toolbar-btn" aria-label="Fill" onClick={handleFill}>
             Fill <span className="shortcut-hint">(Alt+Backspace)</span>
           </button>
         </div>

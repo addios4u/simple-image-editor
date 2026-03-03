@@ -77,4 +77,21 @@ describe('editorStore', () => {
     setStrokeColor('#00ff00');
     expect(useEditorStore.getState().strokeColor).toBe('#00ff00');
   });
+
+  describe('selection', () => {
+    it('initial selection is null', () => {
+      expect(useEditorStore.getState().selection).toBeNull();
+    });
+
+    it('setSelection sets a selection rect', () => {
+      useEditorStore.getState().setSelection({ x: 10, y: 20, width: 100, height: 50 });
+      expect(useEditorStore.getState().selection).toEqual({ x: 10, y: 20, width: 100, height: 50 });
+    });
+
+    it('setSelection(null) clears selection', () => {
+      useEditorStore.getState().setSelection({ x: 10, y: 20, width: 100, height: 50 });
+      useEditorStore.getState().setSelection(null);
+      expect(useEditorStore.getState().selection).toBeNull();
+    });
+  });
 });

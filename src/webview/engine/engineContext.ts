@@ -177,6 +177,101 @@ export function fillRectLayer(
 }
 
 // ---------------------------------------------------------------------------
+// Clipboard
+// ---------------------------------------------------------------------------
+
+export function copySelection(
+  layerId: string,
+  x: number, y: number, w: number, h: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !clipboard || !wasmMemory) return;
+
+  // Build a temporary PixelBuffer from the layer's raw pixels.
+  const mod = getModule();
+  const cw = compositor.width();
+  const ch = compositor.height();
+  const tmp = new mod.PixelBuffer(cw, ch);
+
+  const dstPtr = tmp.data_ptr();
+  const dstLen = tmp.data_len();
+  const srcPtr = compositor.get_layer_data_ptr(idx);
+  const srcLen = compositor.get_layer_data_len(idx);
+
+  if (srcPtr && srcLen > 0 && dstLen === srcLen) {
+    const dst = new Uint8Array(wasmMemory.buffer, dstPtr, dstLen);
+    const src = new Uint8Array(wasmMemory.buffer, srcPtr, srcLen);
+    dst.set(src);
+  }
+
+  clipboard.copy(tmp, x, y, w, h);
+  tmp.free();
+}
+
+export function cutSelection(
+  layerId: string,
+  x: number, y: number, w: number, h: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !clipboard || !wasmMemory) return;
+
+  const mod = getModule();
+  const cw = compositor.width();
+  const ch = compositor.height();
+  const tmp = new mod.PixelBuffer(cw, ch);
+
+  const dstPtr = tmp.data_ptr();
+  const dstLen = tmp.data_len();
+  const srcPtr = compositor.get_layer_data_ptr(idx);
+  const srcLen = compositor.get_layer_data_len(idx);
+
+  if (srcPtr && srcLen > 0 && dstLen === srcLen) {
+    const dst = new Uint8Array(wasmMemory.buffer, dstPtr, dstLen);
+    const src = new Uint8Array(wasmMemory.buffer, srcPtr, srcLen);
+    dst.set(src);
+  }
+
+  clipboard.cut(tmp, x, y, w, h);
+
+  // Write back the cleared region to the layer.
+  const updated = new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len());
+  compositor.set_layer_data(idx, updated);
+  tmp.free();
+}
+
+export function pasteClipboard(
+  layerId: string,
+  x: number, y: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !clipboard || !wasmMemory) return;
+
+  const mod = getModule();
+  const cw = compositor.width();
+  const ch = compositor.height();
+  const tmp = new mod.PixelBuffer(cw, ch);
+
+  // Copy current layer pixels into tmp.
+  const dstPtr = tmp.data_ptr();
+  const dstLen = tmp.data_len();
+  const srcPtr = compositor.get_layer_data_ptr(idx);
+  const srcLen = compositor.get_layer_data_len(idx);
+
+  if (srcPtr && srcLen > 0 && dstLen === srcLen) {
+    const dst = new Uint8Array(wasmMemory.buffer, dstPtr, dstLen);
+    const src = new Uint8Array(wasmMemory.buffer, srcPtr, srcLen);
+    dst.set(src);
+  }
+
+  clipboard.paste(tmp, x, y);
+
+  // Write back pasted result to the layer.
+  const updated = new Uint8Array(wasmMemory.buffer, tmp.data_ptr(), tmp.data_len());
+  compositor.set_layer_data(idx, updated);
+  tmp.free();
+}
+
+// ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 

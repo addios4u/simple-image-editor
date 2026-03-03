@@ -15,6 +15,30 @@ vi.mock('../../state/historyStore', () => ({
   },
 }));
 
+const mockFillRectLayer = vi.fn();
+const mockRequestRender = vi.fn();
+const mockCopySelection = vi.fn();
+const mockCutSelection = vi.fn();
+const mockPasteClipboard = vi.fn();
+
+vi.mock('../../engine/engineContext', () => ({
+  fillRectLayer: (...args: unknown[]) => mockFillRectLayer(...args),
+  requestRender: (...args: unknown[]) => mockRequestRender(...args),
+  copySelection: (...args: unknown[]) => mockCopySelection(...args),
+  cutSelection: (...args: unknown[]) => mockCutSelection(...args),
+  pasteClipboard: (...args: unknown[]) => mockPasteClipboard(...args),
+}));
+
+vi.mock('../../engine/helpers', () => ({
+  hexToPackedRGBA: (hex: string) => hex === '#ff0000' ? 0xff0000ff : 0x000000ff,
+}));
+
+vi.mock('../../state/layerStore', () => ({
+  useLayerStore: {
+    getState: () => ({ activeLayerId: 'layer-1' }),
+  },
+}));
+
 function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...opts }));
 }
@@ -102,6 +126,87 @@ describe('useKeyboardShortcuts', () => {
       renderHook(() => useKeyboardShortcuts());
       fireKey('b', { metaKey: true });
       expect(useEditorStore.getState().activeTool).toBe('select'); // unchanged
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Fill (Alt+Backspace)
+  // ---------------------------------------------------------------
+
+  describe('Fill shortcut', () => {
+    it('Alt+Backspace fills entire canvas when no selection', () => {
+      useEditorStore.setState({
+        fillColor: '#000000',
+        selection: null,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('Backspace', { altKey: true });
+
+      expect(mockFillRectLayer).toHaveBeenCalledWith('layer-1', 0, 0, 800, 600, 0x000000ff);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('Alt+Backspace fills selection rect when selection exists', () => {
+      useEditorStore.setState({
+        fillColor: '#ff0000',
+        selection: { x: 10, y: 20, width: 100, height: 50 },
+      });
+
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('Backspace', { altKey: true });
+
+      expect(mockFillRectLayer).toHaveBeenCalledWith('layer-1', 10, 20, 100, 50, 0xff0000ff);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Clipboard (Cmd+C / Cmd+X / Cmd+V)
+  // ---------------------------------------------------------------
+
+  describe('Clipboard shortcuts', () => {
+    beforeEach(() => {
+      useEditorStore.setState({
+        selection: { x: 10, y: 20, width: 100, height: 50 },
+      });
+    });
+
+    it('Cmd+C calls copySelection with active layer and selection', () => {
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('c', { metaKey: true });
+
+      expect(mockCopySelection).toHaveBeenCalledWith(
+        'layer-1', 10, 20, 100, 50,
+      );
+    });
+
+    it('Cmd+X calls cutSelection with active layer and selection', () => {
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('x', { metaKey: true });
+
+      expect(mockCutSelection).toHaveBeenCalledWith(
+        'layer-1', 10, 20, 100, 50,
+      );
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cmd+V calls pasteClipboard with active layer', () => {
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('v', { metaKey: true });
+
+      expect(mockPasteClipboard).toHaveBeenCalledWith('layer-1', 0, 0);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cmd+C does nothing when no selection', () => {
+      useEditorStore.setState({ selection: null });
+      renderHook(() => useKeyboardShortcuts());
+      fireKey('c', { metaKey: true });
+
+      expect(mockCopySelection).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { MarqueeTool } from '../MarqueeTool';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { MarqueeTool, type MarqueeToolConfig } from '../MarqueeTool';
 import type { PointerEvent } from '../BaseTool';
 
 describe('MarqueeTool', () => {
@@ -78,5 +78,45 @@ describe('MarqueeTool', () => {
     tool.reset();
     expect(tool.isSelecting).toBe(false);
     expect(tool.getSelectionRect()).toBeNull();
+  });
+
+  // ---------------------------------------------------------------
+  // Config-based selection callback (Phase E-1)
+  // ---------------------------------------------------------------
+
+  describe('with config', () => {
+    const mockSetSelection = vi.fn();
+    let configTool: MarqueeTool;
+    const config: MarqueeToolConfig = {
+      setSelection: mockSetSelection,
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      configTool = new MarqueeTool(config);
+    });
+
+    it('calls setSelection on pointer up with final rect', () => {
+      configTool.onPointerDown({ x: 10, y: 20, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      configTool.onPointerMove({ x: 110, y: 70, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      configTool.onPointerUp({ x: 110, y: 70, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+
+      expect(mockSetSelection).toHaveBeenCalledWith({ x: 10, y: 20, width: 100, height: 50 });
+    });
+
+    it('calls setSelection with null on reset', () => {
+      configTool.onPointerDown({ x: 10, y: 20, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      configTool.onPointerMove({ x: 50, y: 50, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+
+      configTool.reset();
+      expect(mockSetSelection).toHaveBeenCalledWith(null);
+    });
+
+    it('calls setSelection during drag (live preview)', () => {
+      configTool.onPointerDown({ x: 0, y: 0, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+      configTool.onPointerMove({ x: 50, y: 50, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+
+      expect(mockSetSelection).toHaveBeenCalledWith({ x: 0, y: 0, width: 50, height: 50 });
+    });
   });
 });

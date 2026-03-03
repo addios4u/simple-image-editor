@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useEditorStore, ToolType } from '../state/editorStore';
 import { useHistoryStore } from '../state/historyStore';
+import { useLayerStore } from '../state/layerStore';
+import { fillRectLayer, requestRender, copySelection, cutSelection, pasteClipboard } from '../engine/engineContext';
+import { hexToPackedRGBA } from '../engine/helpers';
 
 const TOOL_KEYS: Record<string, ToolType> = {
   v: 'select',
@@ -36,6 +39,28 @@ export function useKeyboardShortcuts(): void {
           return;
         }
 
+        // Clipboard
+        if (key === 'c' || key === 'x') {
+          const { selection } = useEditorStore.getState();
+          if (!selection) return;
+          const { activeLayerId } = useLayerStore.getState();
+          e.preventDefault();
+          if (key === 'c') {
+            copySelection(activeLayerId, selection.x, selection.y, selection.width, selection.height);
+          } else {
+            cutSelection(activeLayerId, selection.x, selection.y, selection.width, selection.height);
+            requestRender();
+          }
+          return;
+        }
+        if (key === 'v' && !e.shiftKey) {
+          e.preventDefault();
+          const { activeLayerId } = useLayerStore.getState();
+          pasteClipboard(activeLayerId, 0, 0);
+          requestRender();
+          return;
+        }
+
         // Zoom
         if (e.key === '=' || e.key === '+') {
           e.preventDefault();
@@ -49,6 +74,18 @@ export function useKeyboardShortcuts(): void {
           e.preventDefault();
           setZoom(1);
         }
+        return;
+      }
+
+      // --- Alt+Backspace: Fill ---
+      if (e.altKey && e.key === 'Backspace') {
+        e.preventDefault();
+        const { selection, canvasWidth, canvasHeight, fillColor } = useEditorStore.getState();
+        const { activeLayerId } = useLayerStore.getState();
+        const rgba = hexToPackedRGBA(fillColor);
+        const rect = selection ?? { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+        fillRectLayer(activeLayerId, rect.x, rect.y, rect.width, rect.height, rgba);
+        requestRender();
         return;
       }
 

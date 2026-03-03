@@ -4,7 +4,7 @@ import ZoomControls from './ZoomControls';
 import Minimap from './Minimap';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { SelectionTool } from '../tools/SelectionTool';
-import { MarqueeTool } from '../tools/MarqueeTool';
+import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
 import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender } from '../engine/engineContext';
@@ -22,10 +22,14 @@ const brushConfig: BrushToolConfig = {
   requestRender,
 };
 
+const marqueeConfig: MarqueeToolConfig = {
+  setSelection: (rect) => useEditorStore.getState().setSelection(rect),
+};
+
 function createTool(type: ToolType): BaseTool {
   switch (type) {
     case 'marquee':
-      return new MarqueeTool();
+      return new MarqueeTool(marqueeConfig);
     case 'brush':
       return new BrushTool(brushConfig);
     case 'text':
@@ -61,6 +65,7 @@ const Canvas: React.FC = () => {
   const panY = useEditorStore((s) => s.panY);
   const setPan = useEditorStore((s) => s.setPan);
   const activeTool = useEditorStore((s) => s.activeTool);
+  const selection = useEditorStore((s) => s.selection);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +139,22 @@ const Canvas: React.FC = () => {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
           />
+          {selection && selection.width > 0 && selection.height > 0 && (
+            <div
+              data-testid="selection-overlay"
+              className="selection-overlay"
+              style={{
+                position: 'absolute',
+                left: selection.x,
+                top: selection.y,
+                width: selection.width,
+                height: selection.height,
+                border: '1px dashed #fff',
+                outline: '1px dashed #000',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       </div>
       <Minimap

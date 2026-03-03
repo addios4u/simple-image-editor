@@ -1,8 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+
+const mockFillRectLayer = vi.fn();
+const mockRequestRender = vi.fn();
+
+vi.mock('../../engine/engineContext', () => ({
+  fillRectLayer: (...args: unknown[]) => mockFillRectLayer(...args),
+  requestRender: (...args: unknown[]) => mockRequestRender(...args),
+}));
+
+vi.mock('../../engine/helpers', () => ({
+  hexToPackedRGBA: (hex: string) => hex === '#ff0000' ? 0xff0000ff : 0x000000ff,
+}));
+
 import PropertyPanel from '../PropertyPanel';
 import { useEditorStore } from '../../state/editorStore';
+import { useLayerStore } from '../../state/layerStore';
 
 describe('PropertyPanel', () => {
   beforeEach(() => {
@@ -79,5 +93,42 @@ describe('PropertyPanel', () => {
     render(<PropertyPanel />);
     const strokeBtn = screen.getByRole('button', { name: /stroke/i });
     expect(strokeBtn).toBeInTheDocument();
+  });
+
+  describe('Fill button action', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      useLayerStore.setState({ activeLayerId: 'layer-1' });
+    });
+
+    it('fills entire canvas when no selection', () => {
+      useEditorStore.setState({
+        fillColor: '#000000',
+        selection: null,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      render(<PropertyPanel />);
+      const fillBtn = screen.getByRole('button', { name: /fill/i });
+      fireEvent.click(fillBtn);
+
+      expect(mockFillRectLayer).toHaveBeenCalledWith('layer-1', 0, 0, 800, 600, 0x000000ff);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('fills selection rect when selection exists', () => {
+      useEditorStore.setState({
+        fillColor: '#ff0000',
+        selection: { x: 10, y: 20, width: 100, height: 50 },
+      });
+
+      render(<PropertyPanel />);
+      const fillBtn = screen.getByRole('button', { name: /fill/i });
+      fireEvent.click(fillBtn);
+
+      expect(mockFillRectLayer).toHaveBeenCalledWith('layer-1', 10, 20, 100, 50, 0xff0000ff);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -4,6 +4,13 @@ export type EditorMode = 'viewer' | 'editor';
 export type ToolType = 'select' | 'marquee' | 'brush' | 'text' | 'zoom';
 export type SidebarTab = 'layers' | 'properties' | 'ai';
 
+export interface SelectionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface EditorState {
   mode: EditorMode;
   activeTool: ToolType;
@@ -18,6 +25,7 @@ interface EditorState {
   imageData: Uint8Array | null;
   fileName: string;
   strokeWidth: number;
+  selection: SelectionRect | null;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -29,6 +37,7 @@ interface EditorState {
   setActiveTab: (tab: SidebarTab) => void;
   setImageData: (data: Uint8Array, fileName: string) => void;
   setStrokeWidth: (width: number) => void;
+  setSelection: (sel: SelectionRect | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -45,6 +54,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageData: null,
   fileName: '',
   strokeWidth: 5,
+  selection: null,
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -55,4 +65,5 @@ export const useEditorStore = create<EditorState>((set) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   setImageData: (data, fileName) => set({ imageData: data, fileName }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
+  setSelection: (sel) => set({ selection: sel }),
 }));

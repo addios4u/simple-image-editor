@@ -7,6 +7,10 @@ export interface SelectionRect {
   height: number;
 }
 
+export interface MarqueeToolConfig {
+  setSelection: (rect: SelectionRect | null) => void;
+}
+
 export class MarqueeTool extends BaseTool {
   readonly name = 'marquee';
 
@@ -14,6 +18,12 @@ export class MarqueeTool extends BaseTool {
 
   private startPoint: Point | null = null;
   private selectionRect: SelectionRect | null = null;
+  private config: MarqueeToolConfig | undefined;
+
+  constructor(config?: MarqueeToolConfig) {
+    super();
+    this.config = config;
+  }
 
   getCursor(): string {
     return 'crosshair';
@@ -28,12 +38,14 @@ export class MarqueeTool extends BaseTool {
   onPointerMove(e: PointerEvent): void {
     if (!this.isSelecting || !this.startPoint) return;
     this.updateRect(e);
+    this.config?.setSelection(this.selectionRect);
   }
 
   onPointerUp(e: PointerEvent): void {
     if (!this.isSelecting || !this.startPoint) return;
     this.updateRect(e);
     this.isSelecting = false;
+    this.config?.setSelection(this.selectionRect);
   }
 
   getSelectionRect(): SelectionRect | null {
@@ -44,6 +56,7 @@ export class MarqueeTool extends BaseTool {
     this.isSelecting = false;
     this.startPoint = null;
     this.selectionRect = null;
+    this.config?.setSelection(null);
   }
 
   private updateRect(e: PointerEvent): void {
