@@ -10,6 +10,7 @@ import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, req
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
+import { getSelectionMask } from '../engine/selectionMask';
 
 /** Lazy config — getters read current store state on each call. */
 const brushConfig: BrushToolConfig = {
@@ -44,10 +45,20 @@ const moveConfig: MoveToolConfig = {
   requestRender,
 };
 
+// Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.
+let sharedContour: Array<Array<[number, number]>> | null = null;
+
 const marqueeConfig: MarqueeToolConfig = {
   setSelection: (rect) => useEditorStore.getState().setSelection(rect),
-  getSelection: () => useEditorStore.getState().selection,
   getSelectionShape: () => useEditorStore.getState().selectionShape,
+  getCanvasSize: () => ({
+    width: useEditorStore.getState().canvasWidth,
+    height: useEditorStore.getState().canvasHeight,
+  }),
+  getMask: () => getSelectionMask(),
+  onContourChange: (contour) => {
+    sharedContour = contour;
+  },
 };
 
 function createTool(type: ToolType): BaseTool {
@@ -87,13 +98,14 @@ const Canvas: React.FC = () => {
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const zoom = useEditorStore((s) => s.zoom);
   const activeTool = useEditorStore((s) => s.activeTool);
-  const selection = useEditorStore((s) => s.selection);
-  const selectionShape = useEditorStore((s) => s.selectionShape);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const antsOffsetRef = useRef(0);
+  const antsRafRef = useRef<number>(0);
 
   // Setup canvas 2D context and render loop on mount
   useEffect(() => {
@@ -107,8 +119,6 @@ const Canvas: React.FC = () => {
     setupRenderLoop(loop);
     loop.start();
 
-    // Sync canvas dimensions from engine in case the store wasn't updated
-    // (e.g. a prior loadImage error prevented setCanvasSize from running).
     const engineSize = getCanvasSize();
     if (engineSize.width > 0 && engineSize.height > 0) {
       useEditorStore.getState().setCanvasSize(engineSize.width, engineSize.height);
@@ -120,6 +130,65 @@ const Canvas: React.FC = () => {
       loop.stop();
     };
   }, []);
+
+  // Marching ants animation on the overlay canvas
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+
+    let lastTime = 0;
+    const ANTS_SPEED = 40; // pixels per second
+
+    const animate = (time: number) => {
+      const dt = time - lastTime;
+      if (dt > 16) {
+        lastTime = time;
+        antsOffsetRef.current = (antsOffsetRef.current - (dt * ANTS_SPEED) / 1000) % 8;
+
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        const contour = sharedContour;
+        if (contour && contour.length > 0) {
+          ctx.save();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = '#000000';
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = antsOffsetRef.current;
+
+          for (const loop of contour) {
+            if (loop.length < 2) continue;
+            ctx.beginPath();
+            ctx.moveTo(loop[0][0], loop[0][1]);
+            for (let i = 1; i < loop.length; i++) {
+              ctx.lineTo(loop[i][0], loop[i][1]);
+            }
+            ctx.stroke();
+          }
+
+          // White pass for visibility on dark backgrounds
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineDashOffset = antsOffsetRef.current + 4;
+          for (const loop of contour) {
+            if (loop.length < 2) continue;
+            ctx.beginPath();
+            ctx.moveTo(loop[0][0], loop[0][1]);
+            for (let i = 1; i < loop.length; i++) {
+              ctx.lineTo(loop[i][0], loop[i][1]);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+      antsRafRef.current = requestAnimationFrame(animate);
+    };
+
+    antsRafRef.current = requestAnimationFrame(animate);
+    return () => {
+      cancelAnimationFrame(antsRafRef.current);
+    };
+  }, [canvasWidth, canvasHeight]);
 
   const tool = useMemo(() => {
     if (!toolRef.current || toolRef.current.type !== activeTool) {
@@ -184,47 +253,18 @@ const Canvas: React.FC = () => {
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
             />
-            {selection && selection.width > 0 && selection.height > 0 && (
-              <svg
-                data-testid="selection-overlay"
-                className="selection-overlay"
-                style={{
-                  position: 'absolute',
-                  left: selection.x,
-                  top: selection.y,
-                  width: selection.width,
-                  height: selection.height,
-                  pointerEvents: 'none',
-                  overflow: 'visible',
-                }}
-              >
-                {selectionShape === 'ellipse' ? (
-                  <ellipse
-                    cx={selection.width / 2}
-                    cy={selection.height / 2}
-                    rx={selection.width / 2 - 0.5}
-                    ry={selection.height / 2 - 0.5}
-                    fill="none"
-                    stroke="black"
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                    className="marching-ants-stroke"
-                  />
-                ) : (
-                  <rect
-                    x="0.5"
-                    y="0.5"
-                    width={selection.width - 1}
-                    height={selection.height - 1}
-                    fill="none"
-                    stroke="black"
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                    className="marching-ants-stroke"
-                  />
-                )}
-              </svg>
-            )}
+            <canvas
+              ref={overlayRef}
+              data-testid="selection-overlay"
+              width={canvasWidth}
+              height={canvasHeight}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                pointerEvents: 'none',
+              }}
+            />
           </div>
         </div>
       </div>
