@@ -19,6 +19,8 @@ interface LayerState {
   reorderLayers: (layerIds: string[]) => void;
   duplicateLayer: (id: string) => void;
   renameLayer: (id: string, name: string) => void;
+  /** Bulk-set layers (e.g. from ORA load). Updates the internal ID counter. */
+  setLayers: (layers: Layer[]) => void;
   /** Reset the internal ID counter. For test isolation only. */
   _resetCounter: () => void;
 }
@@ -93,6 +95,15 @@ export const useLayerStore = create<LayerState>((set, get) => ({
         l.id === id ? { ...l, name } : l,
       ),
     })),
+
+  setLayers: (newLayers) => {
+    const maxNum = newLayers.reduce((max, l) => {
+      const n = parseInt(l.id.replace('layer-', ''), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 1);
+    nextId = maxNum + 1;
+    set({ layers: newLayers, activeLayerId: newLayers[0]?.id ?? 'layer-1' });
+  },
 
   _resetCounter: () => {
     nextId = 2;

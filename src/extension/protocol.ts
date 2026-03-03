@@ -1,6 +1,6 @@
 // Extension -> Webview messages
 export type ExtToWebviewMessage =
-  | { type: 'init'; body: { data: number[]; fileName: string; isUntitled: boolean; oraData?: number[] } }
+  | { type: 'init'; body: { data: number[]; fileName: string; isUntitled: boolean; oraData?: number[]; isOra?: boolean } }
   | { type: 'update'; body: { edits: EditOperation[] } }
   | { type: 'getFileData'; body: { requestId: string; format: string } }
   | { type: 'getOraData'; body: { requestId: string } }

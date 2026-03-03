@@ -4,7 +4,7 @@ import ViewerMode from './components/ViewerMode';
 import EditorMode from './components/EditorMode';
 import vscodeApi from './vscode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { initEngine, loadImage, requestRender, compositeToBytes, encodeLayerToPng } from './engine/engineContext';
+import { initEngine, loadImage, loadOraData, requestRender, compositeToBytes, encodeLayerToPng } from './engine/engineContext';
 import { writeOra } from './engine/openraster';
 import { useLayerStore } from './state/layerStore';
 import { loadWasmModule } from './engine/loadWasm';
@@ -13,7 +13,7 @@ import { useAIStore } from './state/aiStore';
 
 interface InitMessage {
     type: 'init';
-    body: { data: number[]; fileName: string; isUntitled: boolean };
+    body: { data: number[]; fileName: string; isUntitled: boolean; oraData?: number[]; isOra?: boolean };
 }
 
 interface GetFileDataMessage {
@@ -41,7 +41,7 @@ const App: React.FC = () => {
             const message = event.data;
 
             if (message?.type === 'init') {
-                const { data, fileName: fName } = (message as InitMessage).body;
+                const { data, fileName: fName, oraData, isOra } = (message as InitMessage).body;
                 const imageBytes = new Uint8Array(data);
                 setImageData(imageBytes, fName);
 
@@ -49,9 +49,31 @@ const App: React.FC = () => {
                 if (!fName.toLowerCase().endsWith('.svg')) {
                     try {
                         await initEngine(loadWasmModule);
-                        const { width, height } = loadImage(imageBytes, 'layer-1');
-                        setCanvasSize(width, height);
+
+                        if (oraData && oraData.length > 0) {
+                            // ORA sidecar or .ora direct open → restore layers
+                            const { width, height, layers } = loadOraData(new Uint8Array(oraData));
+                            setCanvasSize(width, height);
+                            useLayerStore.getState().setLayers(
+                                layers.map((l) => ({
+                                    id: l.id,
+                                    name: l.name,
+                                    opacity: l.opacity,
+                                    visible: l.visible,
+                                })),
+                            );
+                        } else {
+                            // Normal image → single layer
+                            const { width, height } = loadImage(imageBytes, 'layer-1');
+                            setCanvasSize(width, height);
+                        }
+
                         requestRender();
+
+                        // .ora files enter editor mode automatically
+                        if (isOra) {
+                            useEditorStore.getState().setMode('editor');
+                        }
                     } catch (err) {
                         console.error('Failed to initialize WASM engine:', err);
                     }

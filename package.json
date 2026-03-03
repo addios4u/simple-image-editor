@@ -32,6 +32,9 @@
           },
           {
             "filenamePattern": "*.gif"
+          },
+          {
+            "filenamePattern": "*.ora"
           }
         ],
         "priority": "default"

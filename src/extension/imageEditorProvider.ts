@@ -53,14 +53,18 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         const fileData = await vscode.workspace.fs.readFile(uri);
         const doc = new ImageDocument(uri, fileData);
 
-        // Check for ORA sidecar
-        const oraUri = vscode.Uri.file(uri.path + '.ora');
-        try {
-            await vscode.workspace.fs.stat(oraUri);
-            const oraData = await vscode.workspace.fs.readFile(oraUri);
-            doc.oraData = oraData;
-        } catch {
-            // No sidecar — that's fine
+        // .ora files are loaded directly — no sidecar check needed
+        const isOra = uri.path.toLowerCase().endsWith('.ora');
+        if (!isOra) {
+            // Check for ORA sidecar
+            const oraUri = vscode.Uri.file(uri.path + '.ora');
+            try {
+                await vscode.workspace.fs.stat(oraUri);
+                const oraData = await vscode.workspace.fs.readFile(oraUri);
+                doc.oraData = oraData;
+            } catch {
+                // No sidecar — that's fine
+            }
         }
 
         return doc;
@@ -97,12 +101,19 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         document: ImageDocument,
         _cancellation: vscode.CancellationToken
     ): Promise<void> {
-        const format = this._getFormatFromUri(document.uri);
-        const data = await this._requestFileData(document, format);
-        await vscode.workspace.fs.writeFile(document.uri, data);
+        const isOra = document.uri.path.toLowerCase().endsWith('.ora');
 
-        // ORA sidecar: save or clean up
-        await this._saveOrDeleteOraSidecar(document);
+        if (isOra) {
+            // .ora file: save ORA data directly
+            const result = await this._requestOraData(document);
+            await vscode.workspace.fs.writeFile(document.uri, result.data);
+        } else {
+            // Image file: save flattened composite + ORA sidecar
+            const format = this._getFormatFromUri(document.uri);
+            const data = await this._requestFileData(document, format);
+            await vscode.workspace.fs.writeFile(document.uri, data);
+            await this._saveOrDeleteOraSidecar(document);
+        }
 
         document.clearEdits();
     }
@@ -176,14 +187,16 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
     }
 
     /**
-     * Request ORA data from the webview and save or delete the .ora sidecar.
+     * Request ORA data from the webview.
      */
-    private async _saveOrDeleteOraSidecar(document: ImageDocument): Promise<void> {
+    private _requestOraData(document: ImageDocument): Promise<{ data: Uint8Array; layerCount: number }> {
         const panel = this._documentPanelMap.get(document);
-        if (!panel) return;
+        if (!panel) {
+            return Promise.resolve({ data: new Uint8Array(0), layerCount: 0 });
+        }
 
         const requestId = `ora-${this._nextRequestId++}`;
-        const result = await new Promise<{ data: Uint8Array; layerCount: number }>((resolve, reject) => {
+        return new Promise<{ data: Uint8Array; layerCount: number }>((resolve, reject) => {
             this._pendingOraRequests.set(requestId, { resolve, reject });
             panel.webview.postMessage({
                 type: 'getOraData',
@@ -196,7 +209,13 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                 }
             }, 30000);
         });
+    }
 
+    /**
+     * Save or delete the .ora sidecar file alongside the original image.
+     */
+    private async _saveOrDeleteOraSidecar(document: ImageDocument): Promise<void> {
+        const result = await this._requestOraData(document);
         const oraUri = vscode.Uri.file(document.uri.path + '.ora');
 
         if (result.layerCount > 1) {
@@ -240,13 +259,22 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
             case 'ready': {
                 const data = document.getData();
                 const fileName = document.uri.path.split('/').pop() ?? 'untitled';
+                const isOra = fileName.toLowerCase().endsWith('.ora');
                 const initBody: Record<string, unknown> = {
-                    data: Array.from(data),
                     fileName,
                     isUntitled: false,
                 };
-                if (document.oraData) {
-                    initBody.oraData = Array.from(document.oraData);
+                if (isOra) {
+                    // .ora file: send file data as ORA, no raw image data
+                    initBody.data = [];
+                    initBody.oraData = Array.from(data);
+                    initBody.isOra = true;
+                } else {
+                    // Image file: send raw image data + optional ORA sidecar
+                    initBody.data = Array.from(data);
+                    if (document.oraData) {
+                        initBody.oraData = Array.from(document.oraData);
+                    }
                 }
                 panel.webview.postMessage({
                     type: 'init',

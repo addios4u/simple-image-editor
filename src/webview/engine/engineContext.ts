@@ -21,6 +21,7 @@ import {
   createClipboard,
 } from './wasmBridge';
 import { RenderLoop } from './renderLoop';
+import { readOra } from './openraster';
 
 // ---------------------------------------------------------------------------
 // State
@@ -109,6 +110,62 @@ export function loadImage(
 
   decoded.free();
   return { width: w, height: h };
+}
+
+export interface OraLayerInfo {
+  id: string;
+  name: string;
+  opacity: number;
+  visible: boolean;
+}
+
+/**
+ * Load an OpenRaster (.ora) archive into the compositor, restoring all layers.
+ *
+ * @returns The canvas dimensions and layer metadata for updating stores.
+ */
+export function loadOraData(oraBytes: Uint8Array): {
+  width: number;
+  height: number;
+  layers: OraLayerInfo[];
+} {
+  const ora = readOra(oraBytes);
+
+  // (Re-)create compositor at ORA dimensions.
+  compositor?.free();
+  compositor = createLayerCompositor(ora.width, ora.height);
+  canvasWidth = ora.width;
+  canvasHeight = ora.height;
+  layerIndexMap.clear();
+
+  const layers: OraLayerInfo[] = [];
+
+  for (let i = 0; i < ora.layers.length; i++) {
+    const oraLayer = ora.layers[i];
+    const layerId = `layer-${i + 1}`;
+    const decoded = decodeImage(oraLayer.pngData);
+    const idx = compositor.add_layer();
+    layerIndexMap.set(layerId, idx);
+
+    // Copy decoded pixels into the compositor layer.
+    if (wasmMemory) {
+      const src = new Uint8Array(wasmMemory.buffer, decoded.data_ptr(), decoded.data_len());
+      compositor.set_layer_data(idx, src);
+    }
+    decoded.free();
+
+    compositor.set_layer_opacity(idx, oraLayer.opacity);
+    compositor.set_layer_visible(idx, oraLayer.visible);
+
+    layers.push({
+      id: layerId,
+      name: oraLayer.name,
+      opacity: oraLayer.opacity,
+      visible: oraLayer.visible,
+    });
+  }
+
+  return { width: ora.width, height: ora.height, layers };
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +390,14 @@ export function requestRender(): void {
  * Called by the RenderLoop callback.
  */
 export function compositeAndRender(): void {
-  if (!compositor || !canvasCtx || !wasmMemory) return;
+  if (!compositor || !canvasCtx || !wasmMemory) {
+    console.warn('[engine] compositeAndRender skipped:', {
+      compositor: !!compositor,
+      canvasCtx: !!canvasCtx,
+      wasmMemory: !!wasmMemory,
+    });
+    return;
+  }
 
   const composited = compositor.composite();
   const ptr = composited.data_ptr();
