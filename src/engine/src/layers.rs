@@ -4,9 +4,66 @@ use crate::history::RegionSnapshot;
 
 /// Blend mode for layer compositing.
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BlendMode {
     Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    SoftLight,
+    HardLight,
+    Difference,
+    Exclusion,
+}
+
+/// Apply blend mode formula to a single channel.
+/// `s` = source, `d` = destination, both in 0.0–1.0 range.
+fn blend_channel(mode: BlendMode, s: f32, d: f32) -> f32 {
+    match mode {
+        BlendMode::Normal => s,
+        BlendMode::Multiply => s * d,
+        BlendMode::Screen => 1.0 - (1.0 - s) * (1.0 - d),
+        BlendMode::Overlay => {
+            if d < 0.5 {
+                2.0 * s * d
+            } else {
+                1.0 - 2.0 * (1.0 - s) * (1.0 - d)
+            }
+        }
+        BlendMode::Darken => s.min(d),
+        BlendMode::Lighten => s.max(d),
+        BlendMode::ColorDodge => {
+            if s >= 1.0 { 1.0 } else { (d / (1.0 - s)).min(1.0) }
+        }
+        BlendMode::ColorBurn => {
+            if s <= 0.0 { 0.0 } else { (1.0 - (1.0 - d) / s).max(0.0) }
+        }
+        BlendMode::SoftLight => {
+            if s <= 0.5 {
+                d - (1.0 - 2.0 * s) * d * (1.0 - d)
+            } else {
+                let g = if d <= 0.25 {
+                    ((16.0 * d - 12.0) * d + 4.0) * d
+                } else {
+                    d.sqrt()
+                };
+                d + (2.0 * s - 1.0) * (g - d)
+            }
+        }
+        BlendMode::HardLight => {
+            if s < 0.5 {
+                2.0 * s * d
+            } else {
+                1.0 - 2.0 * (1.0 - s) * (1.0 - d)
+            }
+        }
+        BlendMode::Difference => (s - d).abs(),
+        BlendMode::Exclusion => s + d - 2.0 * s * d,
+    }
 }
 
 /// A single layer holding a PixelBuffer and metadata.
@@ -64,6 +121,13 @@ impl LayerCompositor {
     pub fn set_layer_visible(&mut self, index: usize, visible: bool) {
         if let Some(layer) = self.layers.get_mut(index) {
             layer.visible = visible;
+        }
+    }
+
+    /// Set the blend mode of a layer by index.
+    pub fn set_layer_blend_mode(&mut self, index: usize, mode: BlendMode) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            layer.blend_mode = mode;
         }
     }
 
@@ -228,12 +292,17 @@ impl LayerCompositor {
                 let db = out_data[base + 2] as f32 / 255.0;
                 let da = out_data[base + 3] as f32 / 255.0;
 
+                // Apply blend mode to get blended RGB
+                let br = blend_channel(layer.blend_mode, sr, dr);
+                let bg = blend_channel(layer.blend_mode, sg, dg);
+                let bb = blend_channel(layer.blend_mode, sb, db);
+
                 let out_a = sa + da * (1.0 - sa);
                 let (or_, og, ob) = if out_a > 0.0 {
                     (
-                        (sr * sa + dr * da * (1.0 - sa)) / out_a,
-                        (sg * sa + dg * da * (1.0 - sa)) / out_a,
-                        (sb * sa + db * da * (1.0 - sa)) / out_a,
+                        (br * sa + dr * da * (1.0 - sa)) / out_a,
+                        (bg * sa + dg * da * (1.0 - sa)) / out_a,
+                        (bb * sa + db * da * (1.0 - sa)) / out_a,
                     )
                 } else {
                     (0.0, 0.0, 0.0)

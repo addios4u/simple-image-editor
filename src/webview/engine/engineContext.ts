@@ -228,6 +228,12 @@ export function setLayerVisible(layerId: string, visible: boolean): void {
   compositor.set_layer_visible(idx, visible);
 }
 
+export function setLayerBlendMode(layerId: string, mode: number): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.set_layer_blend_mode(idx, mode);
+}
+
 export function moveLayer(fromLayerId: string, toLayerId: string): void {
   const fromIdx = layerIndexMap.get(fromLayerId);
   const toIdx = layerIndexMap.get(toLayerId);

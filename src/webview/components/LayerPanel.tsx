@@ -1,7 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
-import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, addLayer as engineAddLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
+import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, setLayerBlendMode as engineSetBlendMode, addLayer as engineAddLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
+
+const BLEND_MODES = [
+  'Normal', 'Multiply', 'Screen', 'Overlay',
+  'Darken', 'Lighten', 'ColorDodge', 'ColorBurn',
+  'SoftLight', 'HardLight', 'Difference', 'Exclusion',
+] as const;
+
+const BLEND_MODE_MAP: Record<string, number> = {};
+BLEND_MODES.forEach((mode, i) => { BLEND_MODE_MAP[mode] = i; });
 
 const THUMB_SIZE = 40;
 
@@ -68,10 +77,13 @@ const LayerPanel: React.FC = () => {
   const setLayerVisibility = useLayerStore((s) => s.setLayerVisibility);
   const setLayerOpacity = useLayerStore((s) => s.setLayerOpacity);
   const setLayerLocked = useLayerStore((s) => s.setLayerLocked);
+  const setLayerBlendMode = useLayerStore((s) => s.setLayerBlendMode);
   const reorderLayers = useLayerStore((s) => s.reorderLayers);
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [showOpacitySlider, setShowOpacitySlider] = useState(false);
+  const opacityRowRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
 
   const handlePointerDown = useCallback((e: React.PointerEvent, layerId: string) => {
@@ -136,33 +148,74 @@ const LayerPanel: React.FC = () => {
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
   const activeOpacity = activeLayer ? Math.round(activeLayer.opacity * 100) : 100;
+  const activeBlendMode = activeLayer?.blendMode ?? 'Normal';
+
+  // Close opacity slider on click outside
+  useEffect(() => {
+    if (!showOpacitySlider) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (opacityRowRef.current && !opacityRowRef.current.contains(e.target as Node)) {
+        setShowOpacitySlider(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOpacitySlider]);
+
+  const handleOpacityChange = useCallback((value: number) => {
+    if (!activeLayer) return;
+    const v = Math.max(0, Math.min(100, value));
+    setLayerOpacity(activeLayer.id, v / 100);
+    engineSetOpacity(activeLayer.id, v / 100);
+    requestRender();
+  }, [activeLayer, setLayerOpacity]);
 
   return (
     <div className="layer-panel" data-testid="layer-panel">
       {/* Layer Controls */}
       <div className="layer-controls">
         <div className="layer-controls-row">
-          <div className="layer-blend-select">
-            <span className="layer-blend-value">Normal</span>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-          <span className="layer-controls-label">Opacity:</span>
-          <input
-            className="layer-opacity-input"
-            type="number"
-            min={0}
-            max={100}
-            value={activeOpacity}
-            data-testid="layer-opacity-input"
+          <select
+            className="layer-blend-select"
+            value={activeBlendMode}
+            data-testid="layer-blend-select"
             onChange={(e) => {
               if (!activeLayer) return;
-              const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
-              setLayerOpacity(activeLayer.id, v / 100);
-              engineSetOpacity(activeLayer.id, v / 100);
+              setLayerBlendMode(activeLayer.id, e.target.value);
+              engineSetBlendMode(activeLayer.id, BLEND_MODE_MAP[e.target.value] ?? 0);
               requestRender();
             }}
-          />
-          <span className="layer-controls-unit">%</span>
+          >
+            {BLEND_MODES.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+          <span className="layer-controls-label">Opacity:</span>
+          <div className="layer-opacity-wrapper" ref={opacityRowRef}>
+            <input
+              className="layer-opacity-input"
+              type="number"
+              min={0}
+              max={100}
+              value={activeOpacity}
+              data-testid="layer-opacity-input"
+              onFocus={() => setShowOpacitySlider(true)}
+              onChange={(e) => handleOpacityChange(parseInt(e.target.value) || 0)}
+            />
+            <span className="layer-controls-unit">%</span>
+            {showOpacitySlider && (
+              <div className="opacity-slider-popup">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={activeOpacity}
+                  data-testid="layer-opacity-slider"
+                  onChange={(e) => handleOpacityChange(parseInt(e.target.value))}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -205,7 +258,7 @@ const LayerPanel: React.FC = () => {
                   {layer.name}
                 </span>
                 <span className="layer-meta">
-                  Normal, {Math.round(layer.opacity * 100)}%
+                  {layer.blendMode}, {Math.round(layer.opacity * 100)}%
                 </span>
               </div>
               <div className="layer-item-actions">

@@ -292,32 +292,42 @@ canvas {
 }
 
 .layer-blend-select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  appearance: none;
+  -webkit-appearance: none;
   flex: 1;
+  min-width: 0;
   height: 24px;
-  padding: 0 8px;
-  background: var(--bg-primary);
+  padding: 0 22px 0 8px;
+  background: var(--bg-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23969696' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 6px center;
   border: 1px solid var(--border-color);
   border-radius: 3px;
   color: var(--text-primary);
   font-size: 11px;
+  font-family: inherit;
   cursor: pointer;
+  outline: none;
 }
 
-.layer-blend-select svg {
-  color: var(--text-secondary);
+.layer-blend-select:focus {
+  border-color: var(--accent);
 }
 
-.layer-blend-value {
-  font-size: 11px;
+.layer-blend-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .layer-controls-label {
   font-size: 10px;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.layer-opacity-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .layer-controls-unit {
@@ -343,6 +353,26 @@ canvas {
 .layer-opacity-input::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.opacity-slider-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  margin-top: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.opacity-slider-popup input[type="range"] {
+  width: 160px;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 

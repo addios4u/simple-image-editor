@@ -1,7 +1,7 @@
 // Integration tests for LayerCompositor.
 // Run with: cargo test
 
-use image_engine::layers::LayerCompositor;
+use image_engine::layers::{LayerCompositor, BlendMode};
 
 #[test]
 fn test_add_layer_increases_count() {
@@ -361,4 +361,146 @@ fn test_move_layer_invalid_index() {
     comp.add_layer();
     assert!(!comp.move_layer(0, 5));
     assert!(!comp.move_layer(5, 0));
+}
+
+// --- Blend mode tests ---
+
+#[test]
+fn test_set_layer_blend_mode() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let idx = comp.add_layer();
+    // Default is Normal
+    comp.set_layer_blend_mode(idx, BlendMode::Multiply);
+    // Should not panic on invalid index
+    comp.set_layer_blend_mode(99, BlendMode::Screen);
+}
+
+#[test]
+fn test_multiply_blend() {
+    // Multiply: result = src * dst per channel
+    // Red (1,0,0) * Blue (0,0,1) = Black (0,0,0)
+    let mut comp = LayerCompositor::new(1, 1);
+
+    let bottom = comp.add_layer();
+    comp.get_layer_buffer_mut(bottom).unwrap()
+        .set_pixel(0, 0, 0xFF0000FF); // Red, opaque
+
+    let top = comp.add_layer();
+    comp.get_layer_buffer_mut(top).unwrap()
+        .set_pixel(0, 0, 0x0000FFFF); // Blue, opaque
+    comp.set_layer_blend_mode(top, BlendMode::Multiply);
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let g = (pixel >> 16) & 0xFF;
+    let b = (pixel >>  8) & 0xFF;
+    let a =  pixel        & 0xFF;
+
+    // Red * Blue = (1*0, 0*0, 0*1) = Black
+    assert!(r <= 1, "red should be ~0, got {}", r);
+    assert!(g <= 1, "green should be ~0, got {}", g);
+    assert!(b <= 1, "blue should be ~0, got {}", b);
+    assert!(a >= 254, "alpha should be ~255, got {}", a);
+}
+
+#[test]
+fn test_screen_blend() {
+    // Screen: result = 1 - (1-src)*(1-dst)
+    // Dark red (0.5,0,0) screen dark blue (0,0,0.5)
+    // R: 1-(1-0.5)*(1-0) = 0.5, B: 1-(1-0)*(1-0.5) = 0.5
+    let mut comp = LayerCompositor::new(1, 1);
+
+    let bottom = comp.add_layer();
+    comp.get_layer_buffer_mut(bottom).unwrap()
+        .set_pixel(0, 0, 0x800000FF); // ~50% red, opaque
+
+    let top = comp.add_layer();
+    comp.get_layer_buffer_mut(top).unwrap()
+        .set_pixel(0, 0, 0x000080FF); // ~50% blue, opaque
+    comp.set_layer_blend_mode(top, BlendMode::Screen);
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let b = (pixel >>  8) & 0xFF;
+    let a =  pixel        & 0xFF;
+
+    // Screen makes colors brighter; r should stay ~128, b should stay ~128
+    assert!((r as i32 - 128).abs() <= 2, "red should be ~128, got {}", r);
+    assert!((b as i32 - 128).abs() <= 2, "blue should be ~128, got {}", b);
+    assert!(a >= 254, "alpha should be ~255, got {}", a);
+}
+
+#[test]
+fn test_overlay_blend() {
+    // Overlay: if dst < 0.5 → 2*src*dst, else 1-2*(1-src)*(1-dst)
+    // White over mid-gray should give white
+    let mut comp = LayerCompositor::new(1, 1);
+
+    let bottom = comp.add_layer();
+    comp.get_layer_buffer_mut(bottom).unwrap()
+        .set_pixel(0, 0, 0x808080FF); // mid gray
+
+    let top = comp.add_layer();
+    comp.get_layer_buffer_mut(top).unwrap()
+        .set_pixel(0, 0, 0xFFFFFFFF); // white
+    comp.set_layer_blend_mode(top, BlendMode::Overlay);
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    // Overlay white on mid-gray (0.502): since dst > 0.5 → 1 - 2*(1-1)*(1-0.502) = 1.0
+    assert!(r >= 253, "result should be near white, got r={}", r);
+}
+
+#[test]
+fn test_difference_blend() {
+    // Difference: |src - dst|
+    // Same color should give black
+    let mut comp = LayerCompositor::new(1, 1);
+
+    let bottom = comp.add_layer();
+    comp.get_layer_buffer_mut(bottom).unwrap()
+        .set_pixel(0, 0, 0xFF8040FF);
+
+    let top = comp.add_layer();
+    comp.get_layer_buffer_mut(top).unwrap()
+        .set_pixel(0, 0, 0xFF8040FF); // same color
+    comp.set_layer_blend_mode(top, BlendMode::Difference);
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let g = (pixel >> 16) & 0xFF;
+    let b = (pixel >>  8) & 0xFF;
+
+    assert!(r <= 1, "difference of same should be ~0, got r={}", r);
+    assert!(g <= 1, "difference of same should be ~0, got g={}", g);
+    assert!(b <= 1, "difference of same should be ~0, got b={}", b);
+}
+
+#[test]
+fn test_normal_blend_unchanged() {
+    // Verify Normal blend still works the same after refactor
+    let mut comp = LayerCompositor::new(1, 1);
+
+    let bottom = comp.add_layer();
+    comp.get_layer_buffer_mut(bottom).unwrap()
+        .set_pixel(0, 0, 0xFF0000FF); // Red
+
+    let top = comp.add_layer();
+    comp.get_layer_buffer_mut(top).unwrap()
+        .set_pixel(0, 0, 0x0000FFFF); // Blue, opaque
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let b = (pixel >>  8) & 0xFF;
+    let a =  pixel        & 0xFF;
+
+    // Opaque blue on top of red → blue
+    assert!(r <= 1, "red should be ~0, got {}", r);
+    assert!(b >= 254, "blue should be ~255, got {}", b);
+    assert!(a >= 254, "alpha should be ~255, got {}", a);
 }
