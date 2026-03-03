@@ -22,6 +22,9 @@ export async function loadWasmModule(): Promise<WasmModule> {
   const pkg = await import(
     /* webpackChunkName: "wasm" */ '../../../dist/wasm/image_engine'
   ) as any;
-  await pkg.default();
+  // __wbg_init returns instance.exports which includes memory.
+  // The JS wrapper doesn't re-export memory, so we attach it manually.
+  const wasmExports = await pkg.default();
+  pkg.memory = wasmExports.memory;
   return pkg as WasmModule;
 }
