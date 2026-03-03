@@ -99,6 +99,13 @@ body {
   margin: 0 4px;
 }
 
+.editor-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
 /* Main layout */
 .editor-layout {
   flex: 1;

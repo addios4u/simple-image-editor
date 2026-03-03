@@ -83,6 +83,7 @@ const Canvas: React.FC = () => {
     const loop = new RenderLoop(compositeAndRender);
     setupRenderLoop(loop);
     loop.start();
+    requestRender();
 
     return () => {
       loop.stop();
