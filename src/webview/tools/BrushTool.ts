@@ -9,6 +9,7 @@ export interface BrushToolConfig {
   getSize: () => number;
   getHardness: () => number;
   getActiveLayerId: () => string;
+  isLayerLocked: () => boolean;
   brushStrokeLayer: (
     layerId: string, cx: number, cy: number,
     color: number, size: number, hardness: number,
@@ -62,6 +63,7 @@ export class BrushTool extends BaseTool {
 
   private applyBrush(cx: number, cy: number): void {
     if (!this.config) return;
+    if (this.config.isLayerLocked()) return;
     const layerId = this.config.getActiveLayerId();
     const color = this.config.getColor();
     const size = this.config.getSize();

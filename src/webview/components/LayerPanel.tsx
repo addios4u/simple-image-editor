@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
-import { getLayerImageData } from '../engine/engineContext';
+import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, requestRender } from '../engine/engineContext';
 
 const THUMB_SIZE = 40;
 
@@ -93,6 +93,8 @@ const LayerPanel: React.FC = () => {
               if (!activeLayer) return;
               const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
               setLayerOpacity(activeLayer.id, v / 100);
+              engineSetOpacity(activeLayer.id, v / 100);
+              requestRender();
             }}
           />
           <span className="layer-controls-unit">%</span>
@@ -118,6 +120,8 @@ const LayerPanel: React.FC = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setLayerVisibility(layer.id, !layer.visible);
+                  engineSetVisible(layer.id, !layer.visible);
+                  requestRender();
                 }}
                 aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
               >

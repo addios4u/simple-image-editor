@@ -98,6 +98,7 @@ describe('BrushTool', () => {
         getSize: vi.fn(() => 8),
         getHardness: vi.fn(() => 0.7),
         getActiveLayerId: vi.fn(() => 'layer-1'),
+        isLayerLocked: vi.fn(() => false),
         brushStrokeLayer: vi.fn(),
         requestRender: vi.fn(),
       };
@@ -147,6 +148,15 @@ describe('BrushTool', () => {
       expect(config.brushStrokeLayer).toHaveBeenLastCalledWith(
         'layer-1', 50, 60, 0x00FF00FF, 20, 0.7,
       );
+    });
+
+    it('does not call brushStrokeLayer when layer is locked', () => {
+      (config.isLayerLocked as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      tool.onPointerDown(makeEvent(10, 20));
+      tool.onPointerMove(makeEvent(30, 40));
+
+      expect(config.brushStrokeLayer).not.toHaveBeenCalled();
+      expect(config.requestRender).not.toHaveBeenCalled();
     });
 
     it('still records stroke points when config is set', () => {

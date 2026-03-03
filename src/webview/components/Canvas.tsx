@@ -17,6 +17,11 @@ const brushConfig: BrushToolConfig = {
   getSize: () => useEditorStore.getState().strokeWidth,
   getHardness: () => 1.0,
   getActiveLayerId: () => useLayerStore.getState().activeLayerId,
+  isLayerLocked: () => {
+    const { layers, activeLayerId } = useLayerStore.getState();
+    const layer = layers.find((l) => l.id === activeLayerId);
+    return layer?.locked ?? false;
+  },
   brushStrokeLayer,
   requestRender,
 };
