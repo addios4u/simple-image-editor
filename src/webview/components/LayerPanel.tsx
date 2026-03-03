@@ -72,61 +72,64 @@ const LayerPanel: React.FC = () => {
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dragStartY = useRef(0);
 
-  const handleDragStart = useCallback((e: React.DragEvent, layerId: string) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent, layerId: string) => {
+    // Only left button, ignore buttons inside
+    if (e.button !== 0) return;
+    dragStartY.current = e.clientY;
     setDraggedId(layerId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', layerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, layerId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (layerId !== draggedId) {
-      setDropTargetId(layerId);
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!draggedId) return;
+    // Only start visual drag after 4px movement
+    if (Math.abs(e.clientY - dragStartY.current) < 4) return;
+
+    // Find which layer-item we're hovering over
+    const listEl = (e.currentTarget as HTMLElement).closest('.layer-list');
+    if (!listEl) return;
+    const items = listEl.querySelectorAll<HTMLElement>('.layer-item');
+    let targetId: string | null = null;
+    for (const item of items) {
+      const rect = item.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const testId = item.getAttribute('data-testid') ?? '';
+        const id = testId.replace('layer-item-', '');
+        if (id && id !== draggedId) {
+          targetId = id;
+        }
+        break;
+      }
     }
+    setDropTargetId(targetId);
   }, [draggedId]);
 
-  const handleDragLeave = useCallback(() => {
-    setDropTargetId(null);
-  }, []);
+  const handlePointerUp = useCallback(() => {
+    if (draggedId && dropTargetId && draggedId !== dropTargetId) {
+      // Compute new order in store's internal (bottom-to-top) order
+      const currentIds = useLayerStore.getState().layers.map((l) => l.id);
+      const fromIndex = currentIds.indexOf(draggedId);
+      const toIndex = currentIds.indexOf(dropTargetId);
+      if (fromIndex !== -1 && toIndex !== -1) {
+        // Move in WASM first (uses current layerIndexMap)
+        engineMoveLayer(draggedId, dropTargetId);
 
-  const handleDrop = useCallback((e: React.DragEvent, targetLayerId: string) => {
-    e.preventDefault();
-    if (!draggedId || draggedId === targetLayerId) {
-      setDraggedId(null);
-      setDropTargetId(null);
-      return;
+        // Reorder in store
+        const newIds = [...currentIds];
+        newIds.splice(fromIndex, 1);
+        newIds.splice(toIndex, 0, draggedId);
+        reorderLayers(newIds);
+
+        // Rebuild engine index map to match new order
+        rebuildLayerIndexMap(newIds);
+        requestRender();
+      }
     }
-
-    // The displayed list is reversed (top layer first in UI).
-    // reorderLayers expects the internal (bottom-to-top) order.
-    const currentIds = layers.map((l) => l.id);
-    const fromIndex = currentIds.indexOf(draggedId);
-    const toIndex = currentIds.indexOf(targetLayerId);
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    // Move in WASM first
-    engineMoveLayer(draggedId, targetLayerId);
-
-    // Reorder in store
-    const newIds = [...currentIds];
-    newIds.splice(fromIndex, 1);
-    newIds.splice(toIndex, 0, draggedId);
-    reorderLayers(newIds);
-
-    // Rebuild engine index map to match new order
-    rebuildLayerIndexMap(newIds);
-    requestRender();
-
     setDraggedId(null);
     setDropTargetId(null);
-  }, [draggedId, layers, reorderLayers]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedId(null);
-    setDropTargetId(null);
-  }, []);
+  }, [draggedId, dropTargetId, reorderLayers]);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
   const activeOpacity = activeLayer ? Math.round(activeLayer.opacity * 100) : 100;
@@ -173,13 +176,10 @@ const LayerPanel: React.FC = () => {
               key={layer.id}
               className={`layer-item${isActive ? ' active' : ''}${isDragged ? ' dragging' : ''}${isDropTarget ? ' drop-target' : ''}`}
               data-testid={`layer-item-${layer.id}`}
-              draggable
               onClick={() => setActiveLayer(layer.id)}
-              onDragStart={(e) => handleDragStart(e, layer.id)}
-              onDragOver={(e) => handleDragOver(e, layer.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, layer.id)}
-              onDragEnd={handleDragEnd}
+              onPointerDown={(e) => handlePointerDown(e, layer.id)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
             >
               <button
                 className="layer-visibility-btn"
