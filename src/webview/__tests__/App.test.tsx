@@ -25,6 +25,19 @@ vi.mock('../hooks/useKeyboardShortcuts', () => ({
   useKeyboardShortcuts: vi.fn(),
 }));
 
+// Mock historyStore
+const mockHistoryUndo = vi.fn();
+const mockHistoryRedo = vi.fn();
+
+vi.mock('../state/historyStore', () => ({
+  useHistoryStore: {
+    getState: () => ({
+      undo: mockHistoryUndo,
+      redo: mockHistoryRedo,
+    }),
+  },
+}));
+
 // Mock engine context
 const mockInitEngine = vi.fn(async () => {});
 const mockLoadImage = vi.fn(() => ({ width: 640, height: 480 }));
@@ -199,6 +212,28 @@ describe('App', () => {
         },
       });
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('triggerUndo / triggerRedo messages', () => {
+    it('triggerUndo calls historyStore.undo()', async () => {
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({ type: 'triggerUndo' });
+      });
+
+      expect(mockHistoryUndo).toHaveBeenCalledTimes(1);
+    });
+
+    it('triggerRedo calls historyStore.redo()', async () => {
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({ type: 'triggerRedo' });
+      });
+
+      expect(mockHistoryRedo).toHaveBeenCalledTimes(1);
     });
   });
 });

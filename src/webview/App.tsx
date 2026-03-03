@@ -6,6 +6,7 @@ import vscodeApi from './vscode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { initEngine, loadImage, requestRender, compositeToBytes } from './engine/engineContext';
 import { loadWasmModule } from './engine/loadWasm';
+import { useHistoryStore } from './state/historyStore';
 
 interface InitMessage {
     type: 'init';
@@ -47,6 +48,14 @@ const App: React.FC = () => {
                         console.error('Failed to initialize WASM engine:', err);
                     }
                 }
+            }
+
+            if (message?.type === 'triggerUndo') {
+                useHistoryStore.getState().undo();
+            }
+
+            if (message?.type === 'triggerRedo') {
+                useHistoryStore.getState().redo();
             }
 
             if (message?.type === 'getFileData') {

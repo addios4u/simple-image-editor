@@ -1,14 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useHistoryStore } from '../historyStore';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const mockRestoreLayerRegion = vi.fn();
+const mockRequestRender = vi.fn();
+
+vi.mock('../../engine/engineContext', () => ({
+  restoreLayerRegion: (...args: unknown[]) => mockRestoreLayerRegion(...args),
+  requestRender: (...args: unknown[]) => mockRequestRender(...args),
+}));
+
+import { useHistoryStore, _getSnapshotStore } from '../historyStore';
 
 describe('historyStore', () => {
   beforeEach(() => {
-    useHistoryStore.setState({
-      undoStack: [],
-      redoStack: [],
-      canUndo: false,
-      canRedo: false,
-    });
+    vi.clearAllMocks();
+    useHistoryStore.getState().clear();
     useHistoryStore.getState()._resetCounter();
   });
 
@@ -205,5 +210,178 @@ describe('historyStore', () => {
     // Redo stack should have Edit C
     expect(state.redoStack).toHaveLength(1);
     expect(state.redoStack[0].label).toBe('Edit C');
+  });
+
+  // ---------------------------------------------------------------
+  // Snapshot-aware undo/redo (Phase D-1)
+  // ---------------------------------------------------------------
+
+  function mockSnapshot(tag: string) {
+    return {
+      x: () => 0,
+      y: () => 0,
+      width: () => 10,
+      height: () => 10,
+      free: vi.fn(),
+      _tag: tag,
+    } as any;
+  }
+
+  describe('pushEditWithSnapshot / commitSnapshot', () => {
+    it('stores before and after snapshots externally', () => {
+      const before = mockSnapshot('before-1');
+      const after = mockSnapshot('after-1');
+
+      const id = useHistoryStore.getState().pushEditWithSnapshot(
+        'Brush Stroke', 'layer-1', before,
+        { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id, after);
+
+      const snapshots = _getSnapshotStore();
+      expect(snapshots.has(id)).toBe(true);
+      const snap = snapshots.get(id)!;
+      expect(snap.before).toBe(before);
+      expect(snap.after).toBe(after);
+      expect(snap.layerId).toBe('layer-1');
+    });
+
+    it('pushEditWithSnapshot adds entry to undo stack', () => {
+      const before = mockSnapshot('before-1');
+
+      useHistoryStore.getState().pushEditWithSnapshot(
+        'Fill', 'layer-1', before,
+        { x: 0, y: 0, w: 10, h: 10 },
+      );
+
+      const state = useHistoryStore.getState();
+      expect(state.undoStack).toHaveLength(1);
+      expect(state.undoStack[0].label).toBe('Fill');
+      expect(state.canUndo).toBe(true);
+    });
+  });
+
+  describe('undo with snapshots', () => {
+    it('restores before snapshot and calls requestRender', () => {
+      const before = mockSnapshot('before-1');
+      const after = mockSnapshot('after-1');
+
+      const id = useHistoryStore.getState().pushEditWithSnapshot(
+        'Brush', 'layer-1', before, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id, after);
+
+      useHistoryStore.getState().undo();
+
+      expect(mockRestoreLayerRegion).toHaveBeenCalledWith('layer-1', before);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call engine when entry has no snapshot', () => {
+      useHistoryStore.getState().pushEdit('Simple edit');
+
+      useHistoryStore.getState().undo();
+
+      expect(mockRestoreLayerRegion).not.toHaveBeenCalled();
+      expect(mockRequestRender).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('redo with snapshots', () => {
+    it('restores after snapshot and calls requestRender', () => {
+      const before = mockSnapshot('before-1');
+      const after = mockSnapshot('after-1');
+
+      const id = useHistoryStore.getState().pushEditWithSnapshot(
+        'Brush', 'layer-1', before, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id, after);
+
+      useHistoryStore.getState().undo();
+      vi.clearAllMocks();
+
+      useHistoryStore.getState().redo();
+
+      expect(mockRestoreLayerRegion).toHaveBeenCalledWith('layer-1', after);
+      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('clear with snapshots', () => {
+    it('frees all snapshots and empties the external store', () => {
+      const before1 = mockSnapshot('b1');
+      const after1 = mockSnapshot('a1');
+      const before2 = mockSnapshot('b2');
+      const after2 = mockSnapshot('a2');
+
+      const id1 = useHistoryStore.getState().pushEditWithSnapshot(
+        'Edit 1', 'layer-1', before1, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id1, after1);
+
+      const id2 = useHistoryStore.getState().pushEditWithSnapshot(
+        'Edit 2', 'layer-1', before2, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id2, after2);
+
+      useHistoryStore.getState().clear();
+
+      expect(before1.free).toHaveBeenCalled();
+      expect(after1.free).toHaveBeenCalled();
+      expect(before2.free).toHaveBeenCalled();
+      expect(after2.free).toHaveBeenCalled();
+
+      const snapshots = _getSnapshotStore();
+      expect(snapshots.size).toBe(0);
+    });
+  });
+
+  describe('pushEditWithSnapshot overflow frees oldest snapshots', () => {
+    it('frees snapshots of dropped entries when undo stack exceeds MAX_HISTORY', () => {
+      const droppedBefore = mockSnapshot('dropped-before');
+      const droppedAfter = mockSnapshot('dropped-after');
+
+      // Push the first entry with snapshot (this will be dropped later)
+      const id = useHistoryStore.getState().pushEditWithSnapshot(
+        'Edit 0', 'layer-1', droppedBefore, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id, droppedAfter);
+
+      // Push 50 more (metadata-only) to overflow the stack
+      for (let i = 1; i <= 50; i++) {
+        useHistoryStore.getState().pushEdit(`Edit ${i}`);
+      }
+
+      // The first entry should have been dropped, and its snapshots freed
+      expect(droppedBefore.free).toHaveBeenCalled();
+      expect(droppedAfter.free).toHaveBeenCalled();
+
+      const snapshots = _getSnapshotStore();
+      expect(snapshots.has(id)).toBe(false);
+    });
+  });
+
+  describe('pushEdit after undo frees orphaned redo snapshots', () => {
+    it('frees snapshots of entries cleared from redo stack on fork', () => {
+      const before = mockSnapshot('before-fork');
+      const after = mockSnapshot('after-fork');
+
+      const id = useHistoryStore.getState().pushEditWithSnapshot(
+        'Will be undone', 'layer-1', before, { x: 0, y: 0, w: 10, h: 10 },
+      );
+      useHistoryStore.getState().commitSnapshot(id, after);
+
+      // Undo moves entry to redo stack
+      useHistoryStore.getState().undo();
+      expect(before.free).not.toHaveBeenCalled();
+      expect(after.free).not.toHaveBeenCalled();
+
+      // New edit forks: redo stack cleared → orphaned snapshots freed
+      useHistoryStore.getState().pushEdit('Fork edit');
+
+      expect(before.free).toHaveBeenCalled();
+      expect(after.free).toHaveBeenCalled();
+      expect(_getSnapshotStore().has(id)).toBe(false);
+    });
   });
 });
