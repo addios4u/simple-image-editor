@@ -279,6 +279,43 @@ export function brushStrokeLayer(
   compositor.brush_stroke_layer(idx, cx, cy, color, size, hardness);
 }
 
+/**
+ * Render text onto a layer using Canvas 2D (system fonts).
+ * Creates a fresh OffscreenCanvas and writes the result into the WASM layer,
+ * replacing any existing pixel data.
+ */
+export function renderTextToLayer(
+  layerId: string,
+  textData: import('../state/layerStore').TextData,
+  fillColor: string,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  if (canvasWidth === 0 || canvasHeight === 0) return;
+
+  const offscreen = new OffscreenCanvas(canvasWidth, canvasHeight);
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) return;
+
+  const fontParts: string[] = [];
+  if (textData.italic) fontParts.push('italic');
+  if (textData.bold) fontParts.push('bold');
+  fontParts.push(`${textData.fontSize}px`);
+  fontParts.push(textData.fontFamily);
+  ctx.font = fontParts.join(' ');
+  ctx.fillStyle = fillColor;
+  ctx.textBaseline = 'top';
+
+  const lines = textData.text.split('\n');
+  const lineHeight = textData.fontSize * 1.2;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, textData.x, textData.y + i * lineHeight);
+  });
+
+  const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+  compositor.set_layer_data(idx, new Uint8Array(imageData.data.buffer));
+}
+
 export function fillRectLayer(
   layerId: string,
   x: number, y: number, w: number, h: number,

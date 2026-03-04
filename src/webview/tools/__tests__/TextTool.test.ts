@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { TextTool } from '../TextTool';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { TextTool, type TextToolConfig } from '../TextTool';
 import type { PointerEvent } from '../BaseTool';
+
+function makeEvent(x: number, y: number): PointerEvent {
+  return { x, y, button: 0, shiftKey: false, ctrlKey: false, altKey: false };
+}
 
 describe('TextTool', () => {
   let tool: TextTool;
@@ -18,16 +22,13 @@ describe('TextTool', () => {
   });
 
   it('onPointerDown sets text insertion point', () => {
-    const event: PointerEvent = { x: 100, y: 200, button: 0, shiftKey: false, ctrlKey: false, altKey: false };
-    tool.onPointerDown(event);
-
+    tool.onPointerDown(makeEvent(100, 200));
     expect(tool.getInsertionPoint()).toEqual({ x: 100, y: 200 });
   });
 
   it('getInsertionPoint returns the clicked position', () => {
-    tool.onPointerDown({ x: 55, y: 77, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
-    const point = tool.getInsertionPoint();
-    expect(point).toEqual({ x: 55, y: 77 });
+    tool.onPointerDown(makeEvent(55, 77));
+    expect(tool.getInsertionPoint()).toEqual({ x: 55, y: 77 });
   });
 
   it('getInsertionPoint returns null before any click', () => {
@@ -36,24 +37,63 @@ describe('TextTool', () => {
 
   it('isEditing state tracks whether text input is active', () => {
     expect(tool.isEditing).toBe(false);
-
-    tool.onPointerDown({ x: 50, y: 50, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+    tool.onPointerDown(makeEvent(50, 50));
     expect(tool.isEditing).toBe(true);
   });
 
   it('second click updates insertion point', () => {
-    tool.onPointerDown({ x: 10, y: 20, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
-    tool.onPointerDown({ x: 30, y: 40, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
-
+    tool.onPointerDown(makeEvent(10, 20));
+    tool.onPointerDown(makeEvent(30, 40));
     expect(tool.getInsertionPoint()).toEqual({ x: 30, y: 40 });
   });
 
   it('reset clears insertion point and editing state', () => {
-    tool.onPointerDown({ x: 50, y: 50, button: 0, shiftKey: false, ctrlKey: false, altKey: false });
+    tool.onPointerDown(makeEvent(50, 50));
     expect(tool.isEditing).toBe(true);
-
     tool.reset();
     expect(tool.isEditing).toBe(false);
     expect(tool.getInsertionPoint()).toBeNull();
+  });
+
+  describe('with config', () => {
+    let config: TextToolConfig;
+
+    beforeEach(() => {
+      config = {
+        getActiveLayerId: vi.fn(() => 'layer-1'),
+        getLayerTextData: vi.fn(() => undefined),
+        openTextEditor: vi.fn(),
+      };
+      tool = new TextTool(config);
+    });
+
+    it('calls openTextEditor at click position for new text', () => {
+      tool.onPointerDown(makeEvent(100, 200));
+      expect(config.openTextEditor).toHaveBeenCalledWith(100, 200, null);
+    });
+
+    it('calls openTextEditor with existing textData when layer has text', () => {
+      const existing = {
+        text: 'Hello',
+        fontFamily: 'sans-serif',
+        fontSize: 24,
+        bold: false,
+        italic: false,
+        x: 50,
+        y: 80,
+      };
+      (config.getLayerTextData as ReturnType<typeof vi.fn>).mockReturnValue(existing);
+
+      tool.onPointerDown(makeEvent(120, 130));
+
+      expect(config.openTextEditor).toHaveBeenCalledWith(50, 80, 'layer-1', existing);
+    });
+
+    it('does not call openTextEditor when config is not set', () => {
+      const noConfigTool = new TextTool();
+      noConfigTool.onPointerDown(makeEvent(10, 20));
+      // No error should occur
+      expect(noConfigTool.getInsertionPoint()).toEqual({ x: 10, y: 20 });
+    });
   });
 });

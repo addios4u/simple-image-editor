@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { Minus, Plus, MousePointer2, BoxSelect, Circle, PenLine, Type, Download } from 'lucide-react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
+import { useLayerStore } from '../state/layerStore';
 import ModeSegment from './ModeSegment';
+import TextOptionsBar from './TextOptionsBar';
 import { compositeToBytes } from '../engine/engineContext';
 
 function hexToRgb(hex: string): string {
@@ -35,6 +37,11 @@ const Toolbar: React.FC = () => {
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const selectionShape = useEditorStore((s) => s.selectionShape);
   const toggleSelectionShape = useEditorStore((s) => s.toggleSelectionShape);
+
+  const activeLayerId = useLayerStore((s) => s.activeLayerId);
+  const layers = useLayerStore((s) => s.layers);
+  const activeLayerIsText = layers.find((l) => l.id === activeLayerId)?.textData !== undefined;
+  const showTextOptions = activeTool === 'text' || activeLayerIsText;
 
   const [copied, setCopied] = useState('');
 
@@ -131,6 +138,7 @@ const Toolbar: React.FC = () => {
           {tool.icon}
         </button>
       ))}
+      {showTextOptions && <TextOptionsBar />}
       <button
         className="toolbar-btn"
         onClick={handleExport}

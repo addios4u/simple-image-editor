@@ -8,7 +8,7 @@ import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTo
 import { MoveTool, type MoveToolConfig } from '../tools/MoveTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
-import { TextTool } from '../tools/TextTool';
+import { TextTool, type TextToolConfig } from '../tools/TextTool';
 import {
   setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer,
   requestRender, getCanvasSize, setLayerOffset,
@@ -18,7 +18,10 @@ import {
   clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
   cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
   addLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
+  renderTextToLayer,
 } from '../engine/engineContext';
+import TextInputOverlay from './TextInputOverlay';
+import type { TextData } from '../state/layerStore';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
@@ -77,6 +80,15 @@ const moveConfig: MoveToolConfig = {
 // Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.
 let sharedContour: Array<Array<[number, number]>> | null = null;
 
+// Module-level opener — set by Canvas component on mount.
+let _openTextEditor: ((x: number, y: number, layerId: string | null, existing?: TextData) => void) | null = null;
+
+const textConfig: TextToolConfig = {
+  getActiveLayerId: () => useLayerStore.getState().activeLayerId,
+  getLayerTextData: (id) => useLayerStore.getState().layers.find((l) => l.id === id)?.textData,
+  openTextEditor: (x, y, layerId, existing) => _openTextEditor?.(x, y, layerId, existing),
+};
+
 function hexToRgba(hex: string): [number, number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -133,7 +145,7 @@ function createTool(type: ToolType): BaseTool {
     case 'brush':
       return new BrushTool(brushConfig);
     case 'text':
-      return new TextTool();
+      return new TextTool(textConfig);
     default:
       return new MoveTool(moveConfig);
   }
@@ -217,10 +229,35 @@ const Canvas: React.FC = () => {
   const [freeTransformState, setFreeTransformState] = useState<FreeTransformState | null>(null);
   const freeTransformRef = useRef<FreeTransformState | null>(null);
 
+  type TextOverlay = { x: number; y: number; layerId: string | null; existing?: TextData };
+  const [textOverlayState, setTextOverlayState] = useState<TextOverlay | null>(null);
+
   // Keep ref in sync with state
   useEffect(() => {
     freeTransformRef.current = freeTransformState;
   }, [freeTransformState]);
+
+  // 텍스트 편집 opener를 module-level ref에 바인딩
+  useEffect(() => {
+    _openTextEditor = (x, y, layerId, existing) => setTextOverlayState({ x, y, layerId, existing });
+    return () => { _openTextEditor = null; };
+  }, []);
+
+  // LayerPanel 더블클릭 등으로 요청된 텍스트 편집
+  const requestTextEditLayerId = useEditorStore((s) => s.requestTextEditLayerId);
+  useEffect(() => {
+    if (!requestTextEditLayerId) return;
+    const layer = useLayerStore.getState().layers.find((l) => l.id === requestTextEditLayerId);
+    if (layer?.textData) {
+      setTextOverlayState({
+        x: layer.textData.x,
+        y: layer.textData.y,
+        layerId: layer.id,
+        existing: layer.textData,
+      });
+    }
+    useEditorStore.getState().setRequestTextEditLayerId(null);
+  }, [requestTextEditLayerId]);
   const fillColor = useEditorStore((s) => s.fillColor);
   const strokeColor = useEditorStore((s) => s.strokeColor);
   const strokeWidth = useEditorStore((s) => s.strokeWidth);
@@ -392,6 +429,36 @@ const Canvas: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const handleTextConfirm = useCallback((text: string) => {
+    if (!textOverlayState) return;
+    const { x, y, layerId } = textOverlayState;
+    const { fontFamily, fontSize, fontBold, fontItalic, fillColor } = useEditorStore.getState();
+    const textData: TextData = { text, fontFamily, fontSize, bold: fontBold, italic: fontItalic, x, y };
+
+    if (layerId) {
+      // 기존 텍스트 레이어 갱신
+      renderTextToLayer(layerId, textData, fillColor);
+      useLayerStore.getState().setLayerTextData(layerId, textData);
+    } else {
+      // 새 텍스트 레이어 생성
+      useLayerStore.getState().addLayer();
+      const newLayers = useLayerStore.getState().layers;
+      const newLayer = newLayers[newLayers.length - 1];
+      addLayer(newLayer.id);
+      renderTextToLayer(newLayer.id, textData, fillColor);
+      useLayerStore.getState().setLayerTextData(newLayer.id, textData);
+      useLayerStore.getState().setActiveLayer(newLayer.id);
+    }
+
+    useLayerStore.getState().bumpThumbnailVersion();
+    requestRender();
+    setTextOverlayState(null);
+  }, [textOverlayState]);
+
+  const handleTextCancel = useCallback(() => {
+    setTextOverlayState(null);
+  }, []);
+
   const tool = useMemo(() => {
     if (!toolRef.current || toolRef.current.type !== activeTool) {
       const instance = createTool(activeTool);
@@ -402,6 +469,7 @@ const Canvas: React.FC = () => {
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (textOverlayState) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       const evt = toToolEvent(e, zoom);
 
@@ -524,6 +592,7 @@ const Canvas: React.FC = () => {
         <div
           className="canvas-container"
           style={{
+            position: 'relative',
             width: canvasWidth * zoom,
             height: canvasHeight * zoom,
           }}
@@ -559,6 +628,16 @@ const Canvas: React.FC = () => {
               }}
             />
           </div>
+          {textOverlayState && (
+            <TextInputOverlay
+              x={textOverlayState.x}
+              y={textOverlayState.y}
+              zoom={zoom}
+              existing={textOverlayState.existing}
+              onConfirm={handleTextConfirm}
+              onCancel={handleTextCancel}
+            />
+          )}
         </div>
       </div>
       <Minimap

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen, Type } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
+import { useEditorStore } from '../state/editorStore';
 import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, setLayerBlendMode as engineSetBlendMode, addLayer as engineAddLayer, removeLayer as engineRemoveLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
 
 const BLEND_MODES = [
@@ -147,6 +148,17 @@ const LayerPanel: React.FC = () => {
     setDropTargetId(null);
   }, [draggedId, dropTargetId, reorderLayers]);
 
+  const setActiveTool = useEditorStore((s) => s.setActiveTool);
+  const setRequestTextEditLayerId = useEditorStore((s) => s.setRequestTextEditLayerId);
+
+  const handleLayerDoubleClick = useCallback((layerId: string) => {
+    const layer = useLayerStore.getState().layers.find((l) => l.id === layerId);
+    if (!layer?.textData) return;
+    setActiveTool('text');
+    setActiveLayer(layerId);
+    setRequestTextEditLayerId(layerId);
+  }, [setActiveTool, setActiveLayer, setRequestTextEditLayerId]);
+
   const activeLayer = layers.find((l) => l.id === activeLayerId);
   const activeOpacity = activeLayer ? Math.round(activeLayer.opacity * 100) : 100;
   const activeBlendMode = activeLayer?.blendMode ?? 'Normal';
@@ -234,6 +246,7 @@ const LayerPanel: React.FC = () => {
               className={`layer-item${isActive ? ' active' : ''}${isDragged ? ' dragging' : ''}${isDropTarget ? ' drop-target' : ''}`}
               data-testid={`layer-item-${layer.id}`}
               onClick={() => setActiveLayer(layer.id)}
+              onDoubleClick={() => handleLayerDoubleClick(layer.id)}
               onPointerDown={(e) => handlePointerDown(e, layer.id)}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -256,6 +269,7 @@ const LayerPanel: React.FC = () => {
               <LayerThumbnail layerId={layer.id} />
               <div className="layer-info">
                 <span className={`layer-name${isActive ? ' active' : ''}`}>
+                  {layer.textData && <Type size={10} style={{ marginRight: 4, opacity: 0.7, verticalAlign: 'middle' }} />}
                   {layer.name}
                 </span>
                 <span className="layer-meta">

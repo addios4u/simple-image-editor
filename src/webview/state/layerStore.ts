@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 
+export interface TextData {
+  text: string;
+  fontFamily: string;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  x: number;
+  y: number;
+}
+
 export interface Layer {
   id: string;
   name: string;
@@ -9,6 +19,7 @@ export interface Layer {
   blendMode: string;
   offsetX: number;
   offsetY: number;
+  textData?: TextData;
 }
 
 interface LayerState {
@@ -24,6 +35,7 @@ interface LayerState {
   setLayerLocked: (id: string, locked: boolean) => void;
   setLayerBlendMode: (id: string, blendMode: string) => void;
   setLayerOffset: (id: string, x: number, y: number) => void;
+  setLayerTextData: (id: string, textData: TextData | undefined) => void;
   setActiveLayer: (id: string) => void;
   reorderLayers: (layerIds: string[]) => void;
   duplicateLayer: (id: string) => void;
@@ -92,6 +104,13 @@ export const useLayerStore = create<LayerState>((set, get) => ({
     set((state) => ({
       layers: state.layers.map((l) =>
         l.id === id ? { ...l, offsetX: x, offsetY: y } : l,
+      ),
+    })),
+
+  setLayerTextData: (id, textData) =>
+    set((state) => ({
+      layers: state.layers.map((l) =>
+        l.id === id ? { ...l, textData } : l,
       ),
     })),
 

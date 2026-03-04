@@ -29,6 +29,11 @@ interface EditorState {
   selection: SelectionRect | null;
   selectionShape: SelectionShape;
   selectionVersion: number;
+  fontFamily: string;
+  fontSize: number;
+  fontBold: boolean;
+  fontItalic: boolean;
+  requestTextEditLayerId: string | null;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -43,6 +48,11 @@ interface EditorState {
   setSelection: (sel: SelectionRect | null) => void;
   bumpSelectionVersion: () => void;
   toggleSelectionShape: () => void;
+  setFontFamily: (f: string) => void;
+  setFontSize: (s: number) => void;
+  setFontBold: (b: boolean) => void;
+  setFontItalic: (i: boolean) => void;
+  setRequestTextEditLayerId: (id: string | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -62,6 +72,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   selection: null,
   selectionShape: 'rectangle',
   selectionVersion: 0,
+  fontFamily: 'sans-serif',
+  fontSize: 24,
+  fontBold: false,
+  fontItalic: false,
+  requestTextEditLayerId: null,
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -78,4 +93,9 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => ({
       selectionShape: state.selectionShape === 'rectangle' ? 'ellipse' : 'rectangle',
     })),
+  setFontFamily: (fontFamily) => set({ fontFamily }),
+  setFontSize: (fontSize) => set({ fontSize }),
+  setFontBold: (fontBold) => set({ fontBold }),
+  setFontItalic: (fontItalic) => set({ fontItalic }),
+  setRequestTextEditLayerId: (requestTextEditLayerId) => set({ requestTextEditLayerId }),
 }));
