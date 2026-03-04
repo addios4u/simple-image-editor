@@ -512,7 +512,11 @@ const Canvas: React.FC = () => {
     if (!textOverlayState) return;
     const { x, y, layerId } = textOverlayState;
     const { fontFamily, fontSize, fontBold, fontItalic, fillColor } = useEditorStore.getState();
-    const textData: TextData = { text, fontFamily, fontSize, bold: fontBold, italic: fontItalic, x, y };
+    // x, y는 캔버스 좌표 (= layer-local + offset). textData에는 layer-local 좌표를 저장해야 함.
+    const existingLayer = layerId ? useLayerStore.getState().layers.find((l) => l.id === layerId) : null;
+    const localX = x - (existingLayer?.offsetX ?? 0);
+    const localY = y - (existingLayer?.offsetY ?? 0);
+    const textData: TextData = { text, fontFamily, fontSize, bold: fontBold, italic: fontItalic, x: localX, y: localY };
 
     if (layerId) {
       // 기존 텍스트 레이어 갱신
