@@ -101,7 +101,9 @@ fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 
 /// Apply a Gaussian blur with the given sigma to the buffer (in-place).
 /// Uses a separable 1D kernel applied in two passes (horizontal then vertical).
-/// Alpha channel is preserved unchanged.
+/// Operates in premultiplied alpha space to prevent transparent pixels from
+/// darkening adjacent opaque pixels (inner shadow artifact).
+/// Alpha channel is also blurred to create soft edges.
 #[wasm_bindgen]
 pub fn gaussian_blur(buffer: &mut PixelBuffer, sigma: f32) {
     if sigma <= 0.0 {
@@ -117,56 +119,74 @@ pub fn gaussian_blur(buffer: &mut PixelBuffer, sigma: f32) {
     let kernel = gaussian_kernel(sigma);
     let radius = (kernel.len() / 2) as i32;
 
+    // Convert to premultiplied alpha: r_pre = r * a / 255
     let data = buffer.raw_data().to_vec();
+    let mut pre = vec![0u8; w * h * 4];
+    for i in 0..w * h {
+        let a = data[i * 4 + 3] as f32 / 255.0;
+        pre[i * 4]     = (data[i * 4]     as f32 * a).round() as u8;
+        pre[i * 4 + 1] = (data[i * 4 + 1] as f32 * a).round() as u8;
+        pre[i * 4 + 2] = (data[i * 4 + 2] as f32 * a).round() as u8;
+        pre[i * 4 + 3] = data[i * 4 + 3];
+    }
+
     let mut temp = vec![0u8; w * h * 4];
 
-    // Horizontal pass: data -> temp
+    // Horizontal pass on premultiplied data (all 4 channels)
     for y in 0..h {
         for x in 0..w {
-            let mut sum_r: f32 = 0.0;
-            let mut sum_g: f32 = 0.0;
-            let mut sum_b: f32 = 0.0;
-
+            let mut sum = [0.0f32; 4];
             for k in -radius..=radius {
                 let sx = (x as i32 + k).clamp(0, (w as i32) - 1) as usize;
                 let idx = (y * w + sx) * 4;
                 let weight = kernel[(k + radius) as usize];
-                sum_r += data[idx] as f32 * weight;
-                sum_g += data[idx + 1] as f32 * weight;
-                sum_b += data[idx + 2] as f32 * weight;
+                sum[0] += pre[idx]     as f32 * weight;
+                sum[1] += pre[idx + 1] as f32 * weight;
+                sum[2] += pre[idx + 2] as f32 * weight;
+                sum[3] += pre[idx + 3] as f32 * weight;
             }
-
             let dst = (y * w + x) * 4;
-            temp[dst] = sum_r.round().clamp(0.0, 255.0) as u8;
-            temp[dst + 1] = sum_g.round().clamp(0.0, 255.0) as u8;
-            temp[dst + 2] = sum_b.round().clamp(0.0, 255.0) as u8;
-            temp[dst + 3] = data[dst + 3]; // preserve alpha
+            for c in 0..4 {
+                temp[dst + c] = sum[c].round().clamp(0.0, 255.0) as u8;
+            }
         }
     }
 
-    // Vertical pass: temp -> output
-    let out = buffer.raw_data_mut();
+    // Vertical pass on premultiplied temp (all 4 channels)
+    let mut blurred_pre = vec![0u8; w * h * 4];
     for y in 0..h {
         for x in 0..w {
-            let mut sum_r: f32 = 0.0;
-            let mut sum_g: f32 = 0.0;
-            let mut sum_b: f32 = 0.0;
-
+            let mut sum = [0.0f32; 4];
             for k in -radius..=radius {
                 let sy = (y as i32 + k).clamp(0, (h as i32) - 1) as usize;
                 let idx = (sy * w + x) * 4;
                 let weight = kernel[(k + radius) as usize];
-                sum_r += temp[idx] as f32 * weight;
-                sum_g += temp[idx + 1] as f32 * weight;
-                sum_b += temp[idx + 2] as f32 * weight;
+                sum[0] += temp[idx]     as f32 * weight;
+                sum[1] += temp[idx + 1] as f32 * weight;
+                sum[2] += temp[idx + 2] as f32 * weight;
+                sum[3] += temp[idx + 3] as f32 * weight;
             }
-
             let dst = (y * w + x) * 4;
-            out[dst] = sum_r.round().clamp(0.0, 255.0) as u8;
-            out[dst + 1] = sum_g.round().clamp(0.0, 255.0) as u8;
-            out[dst + 2] = sum_b.round().clamp(0.0, 255.0) as u8;
-            out[dst + 3] = temp[dst + 3]; // preserve alpha
+            for c in 0..4 {
+                blurred_pre[dst + c] = sum[c].round().clamp(0.0, 255.0) as u8;
+            }
         }
+    }
+
+    // Convert back to straight alpha: r = r_pre / (a / 255)
+    let out = buffer.raw_data_mut();
+    for i in 0..w * h {
+        let a = blurred_pre[i * 4 + 3] as f32;
+        if a > 0.0 {
+            out[i * 4]     = (blurred_pre[i * 4]     as f32 * 255.0 / a).round().clamp(0.0, 255.0) as u8;
+            out[i * 4 + 1] = (blurred_pre[i * 4 + 1] as f32 * 255.0 / a).round().clamp(0.0, 255.0) as u8;
+            out[i * 4 + 2] = (blurred_pre[i * 4 + 2] as f32 * 255.0 / a).round().clamp(0.0, 255.0) as u8;
+        } else {
+            out[i * 4]     = 0;
+            out[i * 4 + 1] = 0;
+            out[i * 4 + 2] = 0;
+        }
+        out[i * 4 + 3] = blurred_pre[i * 4 + 3]; // blurred alpha
     }
 }
 

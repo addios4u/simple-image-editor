@@ -257,6 +257,9 @@ fn test_box_blur_layer() {
 
 #[test]
 fn test_gaussian_blur_layer() {
+    // Premultiplied-alpha gaussian blur: a single white pixel on a transparent
+    // background spreads its *alpha* outward, while the color (RGB) of the
+    // center pixel remains 255 after un-premultiplying.
     let mut comp = LayerCompositor::new(8, 8);
     let idx = comp.add_layer();
 
@@ -265,10 +268,21 @@ fn test_gaussian_blur_layer() {
 
     comp.gaussian_blur_layer(idx, 1.0);
 
-    let pixel = comp.get_layer_buffer_mut(idx).unwrap().get_pixel(4, 4);
-    let r = (pixel >> 24) & 0xFF;
-    assert!(r < 255, "center should be dimmer after gaussian blur");
-    assert!(r > 0, "center should still have some value");
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+
+    // Center RGB stays at 255 (color preserved in premultiplied space).
+    let center = buf.get_pixel(4, 4);
+    let r = (center >> 24) & 0xFF;
+    let a = center & 0xFF;
+    assert!(r == 255, "center color should stay 255 (premultiplied alpha preserves color)");
+    // Center alpha decreases as it spreads to neighbours.
+    assert!(a < 255, "center alpha should be reduced after blur spreads it");
+    assert!(a > 0,   "center should still have some opacity");
+
+    // Blur has spread alpha to at least one neighbour.
+    let neighbour = buf.get_pixel(5, 4);
+    let na = neighbour & 0xFF;
+    assert!(na > 0, "blur should spread alpha to neighbouring pixels");
 }
 
 #[test]
