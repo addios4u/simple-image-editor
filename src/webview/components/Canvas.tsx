@@ -388,46 +388,130 @@ const Canvas: React.FC = () => {
   }, [canvasWidth, canvasHeight, zoom]);
 
   // Free Transform keyboard handler (Enter = commit, Escape = cancel)
+  // Also handles: Cmd+T = initiate free transform, Cmd+Enter = crop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const tf = freeTransformRef.current;
-      if (!tf) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 
+      const isMod = e.metaKey || e.ctrlKey;
+      const tf = freeTransformRef.current;
+
+      if (tf) {
+        // Free transform active — Enter commits, Escape cancels
+        if (e.key === 'Enter' && !isMod) {
+          e.preventDefault();
+          const { currentBounds, originalPixels, originalW, originalH, layerId, layerOffsetX, layerOffsetY } = tf;
+          const resampled = resampleBuffer(
+            originalPixels, originalW, originalH,
+            currentBounds.width, currentBounds.height,
+          );
+          if (resampled) {
+            stampBufferOntoLayer(
+              layerId, resampled,
+              currentBounds.width, currentBounds.height,
+              currentBounds.x - layerOffsetX, currentBounds.y - layerOffsetY,
+            );
+          }
+          clearFloatingLayer();
+          setFreeTransformState(null);
+          freeTransformRef.current = null;
+          useEditorStore.getState().setSelection(null);
+          requestRender();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          const { originalPixels, originalW, originalH, layerId, originalX, originalY } = tf;
+          stampBufferOntoLayer(layerId, originalPixels, originalW, originalH, originalX, originalY);
+          clearFloatingLayer();
+          setFreeTransformState(null);
+          freeTransformRef.current = null;
+          requestRender();
+        }
+        return;
+      }
+
+      if (!isMod) return;
+
+      // Cmd+T: initiate Free Transform
+      if (e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        const { selection, canvasWidth: cw, canvasHeight: ch, setSelection } = useEditorStore.getState();
+        const { activeLayerId } = useLayerStore.getState();
+        const selMask = getSelectionMask();
+        if (!selMask || !selection || !activeLayerId) return;
+        const maskData = selMask.getMaskData();
+        const bounds = selMask.getBounds();
+        if (!bounds) return;
+
+        const ftLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
+        const offX = ftLayer?.offsetX ?? 0;
+        const offY = ftLayer?.offsetY ?? 0;
+        const adjMask = adjustMaskForOffset(maskData, cw, ch, offX, offY);
+        const extracted = extractMaskedPixels(activeLayerId, adjMask);
+        if (!extracted) return;
+
+        const { x: bx, y: by, width: bw, height: bh } = bounds;
+        const lbx = bx - offX;
+        const lby = by - offY;
+        const originalPixels = new Uint8Array(bw * bh * 4);
+        for (let row = 0; row < bh; row++) {
+          const ly = lby + row;
+          if (ly < 0 || ly >= ch) continue;
+          const colStart = Math.max(0, -lbx);
+          const colEnd = Math.min(bw, cw - lbx);
+          if (colStart >= colEnd) continue;
+          const srcOff = (ly * cw + Math.max(0, lbx)) * 4;
+          const dstOff = (row * bw + colStart) * 4;
+          originalPixels.set(extracted.subarray(srcOff, srcOff + (colEnd - colStart) * 4), dstOff);
+        }
+
+        setFloatingLayer(originalPixels, bw, bh);
+        setFloatingOffset(bx, by);
+        requestRender();
+        sharedContour = null;
+        getSelectionMask()?.clear();
+        setSelection(null);
+
+        const transformState: FreeTransformState = {
+          layerId: activeLayerId,
+          originalPixels,
+          originalW: bw,
+          originalH: bh,
+          originalX: lbx,
+          originalY: lby,
+          layerOffsetX: offX,
+          layerOffsetY: offY,
+          currentBounds: { x: bx, y: by, width: bw, height: bh },
+          activeHandle: null,
+          dragStartX: 0,
+          dragStartY: 0,
+          boundsAtDragStart: { x: bx, y: by, width: bw, height: bh },
+        };
+        setFreeTransformState(transformState);
+        freeTransformRef.current = transformState;
+        return;
+      }
+
+      // Cmd+Enter: Crop
       if (e.key === 'Enter') {
         e.preventDefault();
-        const { currentBounds, originalPixels, originalW, originalH, layerId, layerOffsetX, layerOffsetY } = tf;
-        const resampled = resampleBuffer(
-          originalPixels, originalW, originalH,
-          currentBounds.width, currentBounds.height,
-        );
-        if (resampled) {
-          // currentBounds is canvas-space; convert to layer-local by subtracting layer offset
-          stampBufferOntoLayer(
-            layerId, resampled,
-            currentBounds.width, currentBounds.height,
-            currentBounds.x - layerOffsetX, currentBounds.y - layerOffsetY,
-          );
-        }
-        clearFloatingLayer();
-        setFreeTransformState(null);
-        freeTransformRef.current = null;
-        useEditorStore.getState().setSelection(null);
-        requestRender();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        const { originalPixels, originalW, originalH, layerId, originalX, originalY } = tf;
-        // originalX/Y are layer-local coords (set at init)
-        stampBufferOntoLayer(layerId, originalPixels, originalW, originalH, originalX, originalY);
-        clearFloatingLayer();
-        setFreeTransformState(null);
-        freeTransformRef.current = null;
+        const { selection, setSelection, setCanvasSize } = useEditorStore.getState();
+        if (!selection) return;
+        const { x, y, width: w, height: h } = selection;
+        if (w <= 0 || h <= 0) return;
+        cropCanvas(x, y, w, h);
+        setCanvasSize(w, h);
+        sharedContour = null;
+        getSelectionMask()?.clear();
+        setSelection(null);
+        useLayerStore.getState().bumpThumbnailVersion();
         requestRender();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [setFreeTransformState]);
 
   const handleTextConfirm = useCallback((text: string) => {
     if (!textOverlayState) return;
