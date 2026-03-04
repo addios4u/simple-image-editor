@@ -2,6 +2,8 @@ import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react'
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import Minimap from './Minimap';
 import ContextMenu, { type ContextMenuAction } from './ContextMenu';
+import FillDialog, { type FillDialogResult } from './FillDialog';
+import StrokeDialog, { type StrokeDialogResult } from './StrokeDialog';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { MoveTool, type MoveToolConfig } from '../tools/MoveTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
@@ -140,7 +142,16 @@ const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const fillColor = useEditorStore((s) => s.fillColor);
+  const strokeColor = useEditorStore((s) => s.strokeColor);
+  const strokeWidth = useEditorStore((s) => s.strokeWidth);
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [fillDialogOpen, setFillDialogOpen] = useState(false);
+  const [strokeDialogOpen, setStrokeDialogOpen] = useState(false);
+  const pendingMaskRef = useRef<Uint8Array | null>(null);
+  const pendingLayerIdRef = useRef<string | null>(null);
+  const pendingSelectionRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const antsOffsetRef = useRef(0);
   const antsRafRef = useRef<number>(0);
   const internalClipboardBlobRef = useRef<Blob | null>(null);
@@ -322,6 +333,61 @@ const Canvas: React.FC = () => {
         cursorX={cursorPos.x}
         cursorY={cursorPos.y}
       />
+      {fillDialogOpen && (
+        <FillDialog
+          initialColor={fillColor}
+          onCancel={() => setFillDialogOpen(false)}
+          onConfirm={(result: FillDialogResult) => {
+            setFillDialogOpen(false);
+            const maskData = pendingMaskRef.current;
+            const layerId = pendingLayerIdRef.current;
+            const sel = pendingSelectionRef.current;
+            if (!maskData || !layerId || !sel) return;
+            try {
+              const [r, g, b] = hexToRgba(result.color);
+              const a = Math.round((result.opacity / 100) * 255);
+              const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
+              const before = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              if (!before) return;
+              const entryId = pushEditWithSnapshot('Fill Selection', layerId, before,
+                { x: sel.x, y: sel.y, w: sel.width, h: sel.height });
+              fillMaskedPixels(layerId, maskData, r, g, b, a);
+              const after = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              if (after) commitSnapshot(entryId, after);
+              useEditorStore.getState().setFillColor(result.color);
+              requestRender();
+            } catch (e) { console.error('Fill error:', e); }
+          }}
+        />
+      )}
+      {strokeDialogOpen && (
+        <StrokeDialog
+          initialColor={strokeColor}
+          initialWidth={strokeWidth}
+          onCancel={() => setStrokeDialogOpen(false)}
+          onConfirm={(result: StrokeDialogResult) => {
+            setStrokeDialogOpen(false);
+            const maskData = pendingMaskRef.current;
+            const layerId = pendingLayerIdRef.current;
+            const sel = pendingSelectionRef.current;
+            if (!maskData || !layerId || !sel) return;
+            try {
+              const [r, g, b, a] = hexToRgba(result.color);
+              const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
+              const before = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              if (!before) return;
+              const entryId = pushEditWithSnapshot('Stroke Selection', layerId, before,
+                { x: sel.x, y: sel.y, w: sel.width, h: sel.height });
+              strokeMaskedBoundary(layerId, maskData, r, g, b, a, result.width);
+              const after = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              if (after) commitSnapshot(entryId, after);
+              useEditorStore.getState().setStrokeColor(result.color);
+              useEditorStore.getState().setStrokeWidth(result.width);
+              requestRender();
+            } catch (e) { console.error('Stroke error:', e); }
+          }}
+        />
+      )}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
@@ -330,11 +396,12 @@ const Canvas: React.FC = () => {
           onClose={() => setContextMenu(null)}
           onAction={async (action: ContextMenuAction) => {
             setContextMenu(null);
+            try {
             const mask = getSelectionMask();
             const maskData = mask?.getMaskData();
             const { activeLayerId } = useLayerStore.getState();
             const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
-            const { fillColor, strokeColor, strokeWidth, setSelection, setCanvasSize } = useEditorStore.getState();
+            const { setSelection, setCanvasSize } = useEditorStore.getState();
 
             switch (action) {
               case 'copy': {
@@ -408,40 +475,18 @@ const Canvas: React.FC = () => {
               }
               case 'fill': {
                 if (!maskData || !activeLayerId || !selection) break;
-                const [fr, fg, fb, fa] = hexToRgba(fillColor);
-                const before = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
-                if (!before) break;
-                const entryId = pushEditWithSnapshot(
-                  'Fill Selection', activeLayerId, before,
-                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
-                );
-                fillMaskedPixels(activeLayerId, maskData, fr, fg, fb, fa);
-                const after = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
-                if (after) commitSnapshot(entryId, after);
-                requestRender();
+                pendingMaskRef.current = new Uint8Array(maskData);
+                pendingLayerIdRef.current = activeLayerId;
+                pendingSelectionRef.current = { ...selection };
+                setFillDialogOpen(true);
                 break;
               }
               case 'stroke': {
                 if (!maskData || !activeLayerId || !selection) break;
-                const [sr, sg, sb, sa] = hexToRgba(strokeColor);
-                const before = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
-                if (!before) break;
-                const entryId = pushEditWithSnapshot(
-                  'Stroke Selection', activeLayerId, before,
-                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
-                );
-                strokeMaskedBoundary(activeLayerId, maskData, sr, sg, sb, sa, strokeWidth);
-                const after = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
-                if (after) commitSnapshot(entryId, after);
-                requestRender();
+                pendingMaskRef.current = new Uint8Array(maskData);
+                pendingLayerIdRef.current = activeLayerId;
+                pendingSelectionRef.current = { ...selection };
+                setStrokeDialogOpen(true);
                 break;
               }
               case 'crop': {
@@ -471,6 +516,9 @@ const Canvas: React.FC = () => {
                 console.log('Free Transform: 추후 구현');
                 break;
               }
+            }
+            } catch (e) {
+              console.error('Context menu action error:', e);
             }
           }}
         />
