@@ -107,6 +107,17 @@ export interface WasmLayerCompositor {
     index: number, x: number, y: number, w: number, h: number,
   ): WasmRegionSnapshot;
   restore_layer_region(index: number, snapshot: WasmRegionSnapshot): void;
+  // Masked pixel extraction & floating layer
+  extract_masked_pixels(index: number, mask: Uint8Array): WasmPixelBuffer;
+  stamp_buffer_onto_layer(
+    index: number, src_data: Uint8Array,
+    src_width: number, src_height: number,
+    offset_x: number, offset_y: number,
+  ): void;
+  set_floating_layer(data: Uint8Array, width: number, height: number): void;
+  set_floating_offset(x: number, y: number): void;
+  clear_floating_layer(): void;
+  has_floating_layer(): boolean;
   free(): void;
 }
 

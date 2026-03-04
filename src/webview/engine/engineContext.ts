@@ -382,6 +382,77 @@ export function pasteClipboard(
 }
 
 // ---------------------------------------------------------------------------
+// Masked pixel operations (selection-move)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract pixels under the mask from a layer.
+ * Returns a standalone Uint8Array of RGBA data (width*height*4 bytes).
+ * The masked region in the source layer is cleared to transparent.
+ */
+export function extractMaskedPixels(
+  layerId: string,
+  mask: Uint8Array,
+): Uint8Array | null {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor || !wasmMemory) return null;
+
+  const extracted = compositor.extract_masked_pixels(idx, mask);
+  const ptr = extracted.data_ptr();
+  const len = extracted.data_len();
+
+  // Copy to standalone Uint8Array (WASM memory may grow on next allocation)
+  const result = new Uint8Array(new Uint8Array(wasmMemory.buffer, ptr, len));
+  extracted.free();
+
+  return result;
+}
+
+/**
+ * Stamp pixel data onto a layer at the given offset with alpha compositing.
+ */
+export function stampBufferOntoLayer(
+  layerId: string,
+  srcData: Uint8Array,
+  srcWidth: number,
+  srcHeight: number,
+  offsetX: number,
+  offsetY: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.stamp_buffer_onto_layer(idx, srcData, srcWidth, srcHeight, offsetX, offsetY);
+}
+
+/**
+ * Set floating layer from raw RGBA data for real-time composite rendering.
+ */
+export function setFloatingLayer(
+  data: Uint8Array,
+  width: number,
+  height: number,
+): void {
+  if (!compositor) return;
+  compositor.set_floating_layer(data, width, height);
+}
+
+/**
+ * Update the floating layer's offset.
+ */
+export function setFloatingOffset(x: number, y: number): void {
+  if (!compositor) return;
+  compositor.set_floating_offset(x, y);
+}
+
+/**
+ * Remove the floating layer from the compositor.
+ */
+export function clearFloatingLayer(): void {
+  if (!compositor) return;
+  compositor.clear_floating_layer();
+}
+
+// ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 
