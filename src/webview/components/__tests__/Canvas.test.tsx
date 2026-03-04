@@ -15,6 +15,14 @@ vi.mock('../../engine/engineContext', () => ({
   brushStrokeLayer: vi.fn(),
   requestRender: vi.fn(),
   getCanvasSize: vi.fn(() => ({ width: 0, height: 0 })),
+  setLayerOffset: vi.fn(),
+  extractMaskedPixels: vi.fn(),
+  stampBufferOntoLayer: vi.fn(),
+  setFloatingLayer: vi.fn(),
+  setFloatingOffset: vi.fn(),
+  clearFloatingLayer: vi.fn(),
+  captureLayerRegion: vi.fn(),
+  restoreLayerRegion: vi.fn(),
 }));
 
 vi.mock('../../engine/helpers', () => ({

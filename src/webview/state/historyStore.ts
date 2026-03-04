@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import type { WasmRegionSnapshot } from '../engine/wasmBridge';
 import { restoreLayerRegion, requestRender } from '../engine/engineContext';
+import { getSelectionMask } from '../engine/selectionMask';
+
+/** Restore mask state from a snapshot Uint8Array. */
+function restoreMaskFromSnapshot(maskData: Uint8Array): void {
+  const mask = getSelectionMask();
+  if (mask) {
+    mask.restore(maskData);
+  }
+}
 
 const MAX_HISTORY = 50;
 
@@ -15,6 +24,8 @@ export interface SnapshotData {
   region: { x: number; y: number; w: number; h: number };
   before: WasmRegionSnapshot;
   after?: WasmRegionSnapshot;
+  maskBefore?: Uint8Array;
+  maskAfter?: Uint8Array;
 }
 
 /**
@@ -52,8 +63,9 @@ interface HistoryState {
     layerId: string,
     before: WasmRegionSnapshot,
     region: { x: number; y: number; w: number; h: number },
+    maskBefore?: Uint8Array,
   ) => string;
-  commitSnapshot: (entryId: string, after: WasmRegionSnapshot) => void;
+  commitSnapshot: (entryId: string, after: WasmRegionSnapshot, maskAfter?: Uint8Array) => void;
   undo: () => HistoryEntry | null;
   redo: () => HistoryEntry | null;
   getHistory: () => HistoryEntry[];
@@ -100,7 +112,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       };
     }),
 
-  pushEditWithSnapshot: (label, layerId, before, region) => {
+  pushEditWithSnapshot: (label, layerId, before, region, maskBefore?) => {
     const entryId = `history-${nextId++}`;
     const entry: HistoryEntry = {
       id: entryId,
@@ -109,7 +121,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     };
 
     // Store snapshot externally
-    snapshotStore.set(entryId, { layerId, region, before });
+    snapshotStore.set(entryId, { layerId, region, before, maskBefore });
 
     set((state) => {
       let undoStack = [...state.undoStack, entry];
@@ -137,10 +149,13 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     return entryId;
   },
 
-  commitSnapshot: (entryId, after) => {
+  commitSnapshot: (entryId, after, maskAfter?) => {
     const snap = snapshotStore.get(entryId);
     if (snap) {
       snap.after = after;
+      if (maskAfter) {
+        snap.maskAfter = maskAfter;
+      }
     }
   },
 
@@ -156,6 +171,10 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     const snap = snapshotStore.get(entry.id);
     if (snap) {
       restoreLayerRegion(snap.layerId, snap.before);
+      // Restore mask state if available (selection-move undo)
+      if (snap.maskBefore) {
+        restoreMaskFromSnapshot(snap.maskBefore);
+      }
       requestRender();
     }
 
@@ -181,6 +200,10 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     const snap = snapshotStore.get(entry.id);
     if (snap?.after) {
       restoreLayerRegion(snap.layerId, snap.after);
+      // Restore mask state if available (selection-move redo)
+      if (snap.maskAfter) {
+        restoreMaskFromSnapshot(snap.maskAfter);
+      }
       requestRender();
     }
 

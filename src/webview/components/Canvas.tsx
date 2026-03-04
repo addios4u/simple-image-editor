@@ -6,7 +6,13 @@ import { MoveTool, type MoveToolConfig } from '../tools/MoveTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
 import { BrushTool, type BrushToolConfig } from '../tools/BrushTool';
 import { TextTool } from '../tools/TextTool';
-import { setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer, requestRender, getCanvasSize, setLayerOffset } from '../engine/engineContext';
+import {
+  setupCanvas, setupRenderLoop, compositeAndRender, brushStrokeLayer,
+  requestRender, getCanvasSize, setLayerOffset,
+  extractMaskedPixels, stampBufferOntoLayer,
+  setFloatingLayer, setFloatingOffset, clearFloatingLayer,
+  captureLayerRegion, restoreLayerRegion,
+} from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
@@ -43,6 +49,22 @@ const moveConfig: MoveToolConfig = {
     setLayerOffset(layerId, x, y);
   },
   requestRender,
+  // Selection-move support
+  getMask: () => getSelectionMask(),
+  getCanvasSize: () => ({
+    width: useEditorStore.getState().canvasWidth,
+    height: useEditorStore.getState().canvasHeight,
+  }),
+  extractMaskedPixels,
+  stampBufferOntoLayer,
+  setFloatingLayer,
+  setFloatingOffset,
+  clearFloatingLayer,
+  captureLayerRegion,
+  restoreLayerRegion,
+  onContourChange: (contour) => {
+    sharedContour = contour;
+  },
 };
 
 // Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.
