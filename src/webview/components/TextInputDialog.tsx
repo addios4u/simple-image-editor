@@ -110,6 +110,16 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
           >
             <Italic size={13} />
           </button>
+          <div
+            title={`텍스트 색상: ${fillColor}`}
+            style={{
+              width: 18, height: 18,
+              borderRadius: 3,
+              background: fillColor,
+              border: '1px solid #777',
+              flexShrink: 0,
+            }}
+          />
         </div>
 
         {/* 텍스트 입력 */}
@@ -125,7 +135,7 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
             fontSize,
             fontWeight: fontBold ? 'bold' : 'normal',
             fontStyle: fontItalic ? 'italic' : 'normal',
-            color: fillColor,
+            color: '#ddd',
             background: '#1e1e1e',
             border: '1px solid #555',
             borderRadius: 4,
