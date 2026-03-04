@@ -28,12 +28,14 @@ vi.mock('../hooks/useKeyboardShortcuts', () => ({
 // Mock historyStore
 const mockHistoryUndo = vi.fn();
 const mockHistoryRedo = vi.fn();
+const mockHistoryPushEdit = vi.fn();
 
 vi.mock('../state/historyStore', () => ({
   useHistoryStore: {
     getState: () => ({
       undo: mockHistoryUndo,
       redo: mockHistoryRedo,
+      pushEdit: mockHistoryPushEdit,
     }),
     subscribe: vi.fn(() => vi.fn()),
   },
@@ -45,6 +47,7 @@ const mockLoadImage = vi.fn(() => ({ width: 640, height: 480 }));
 const mockRequestRender = vi.fn();
 const mockCompositeToBytes = vi.fn(() => new Uint8Array([0x89, 0x50]));
 const mockEncodeLayerToPng = vi.fn(() => new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+const mockApplyAIImageAsLayer = vi.fn(async () => true);
 
 vi.mock('../engine/engineContext', () => ({
   initEngine: (...args: any[]) => mockInitEngine(...args),
@@ -52,6 +55,7 @@ vi.mock('../engine/engineContext', () => ({
   requestRender: (...args: any[]) => mockRequestRender(...args),
   compositeToBytes: (...args: any[]) => mockCompositeToBytes(...args),
   encodeLayerToPng: (...args: any[]) => mockEncodeLayerToPng(...args),
+  applyAIImageAsLayer: (...args: any[]) => mockApplyAIImageAsLayer(...args),
 }));
 
 // Mock openraster
@@ -69,6 +73,7 @@ vi.mock('../engine/loadWasm', () => ({
 import App from '../App';
 import { useEditorStore } from '../state/editorStore';
 import { useAIStore } from '../state/aiStore';
+import { useLayerStore } from '../state/layerStore';
 
 function dispatchMessage(data: unknown): void {
   window.dispatchEvent(new MessageEvent('message', { data }));
@@ -250,23 +255,19 @@ describe('App', () => {
 
   describe('aiGenerateResult message', () => {
     beforeEach(() => {
-      useAIStore.setState({ isGenerating: true, result: null, error: null });
-    });
-
-    it('updates aiStore with result on success', async () => {
-      render(<App />);
-
-      await act(async () => {
-        dispatchMessage({
-          type: 'aiGenerateResult',
-          body: { imageData: 'iVBORw0KGgoAAAANS' },
-        });
+      useAIStore.setState({
+        isGenerating: true,
+        result: null,
+        error: null,
+        generationContext: {
+          targetWidth: 800,
+          targetHeight: 600,
+          selectionX: 0,
+          selectionY: 0,
+          apiSize: '1024x1024',
+        },
       });
-
-      const state = useAIStore.getState();
-      expect(state.isGenerating).toBe(false);
-      expect(state.result).toBe('iVBORw0KGgoAAAANS');
-      expect(state.error).toBeNull();
+      useEditorStore.setState({ canvasWidth: 800, canvasHeight: 600 });
     });
 
     it('updates aiStore with error on failure', async () => {
@@ -281,8 +282,51 @@ describe('App', () => {
 
       const state = useAIStore.getState();
       expect(state.isGenerating).toBe(false);
-      expect(state.result).toBeNull();
       expect(state.error).toBe('No API key configured for openai');
+    });
+
+    it('auto-applies image as new layer on success', async () => {
+      render(<App />);
+      mockApplyAIImageAsLayer.mockClear();
+      mockRequestRender.mockClear();
+
+      await act(async () => {
+        dispatchMessage({
+          type: 'aiGenerateResult',
+          body: { imageData: 'iVBORw0KGgoAAAANS' },
+        });
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      const state = useAIStore.getState();
+      expect(state.isGenerating).toBe(false);
+      expect(state.error).toBeNull();
+
+      // Verify applyAIImageAsLayer was called with correct params
+      expect(mockApplyAIImageAsLayer).toHaveBeenCalledWith(
+        'iVBORw0KGgoAAAANS',
+        expect.any(String),
+        800, 600, 0, 0,
+      );
+      // Verify render was requested
+      expect(mockRequestRender).toHaveBeenCalled();
+    });
+
+    it('does not add layer when no generationContext', async () => {
+      useAIStore.setState({ generationContext: null });
+      const layerCountBefore = useLayerStore.getState().layers.length;
+      render(<App />);
+
+      await act(async () => {
+        dispatchMessage({
+          type: 'aiGenerateResult',
+          body: { imageData: 'iVBORw0KGgoAAAANS' },
+        });
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      // No layer should be added
+      expect(useLayerStore.getState().layers.length).toBe(layerCountBefore);
     });
   });
 

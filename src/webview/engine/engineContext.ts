@@ -633,6 +633,51 @@ export async function pasteImageAsNewLayer(
   return true;
 }
 
+/**
+ * Decode a base64-encoded PNG, resize to target dimensions, and stamp onto
+ * a new layer at the given offset.  Returns true on success.
+ */
+export async function applyAIImageAsLayer(
+  base64: string,
+  newLayerId: string,
+  targetWidth: number,
+  targetHeight: number,
+  offsetX: number,
+  offsetY: number,
+): Promise<boolean> {
+  if (!compositor || !wasmMemory) return false;
+
+  // Decode base64 → Blob → ImageBitmap
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'image/png' });
+  const bitmap = await createImageBitmap(blob);
+
+  // Render to OffscreenCanvas to get raw RGBA
+  const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx2 = offscreen.getContext('2d');
+  if (!ctx2) { bitmap.close(); return false; }
+  ctx2.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const imgData = ctx2.getImageData(0, 0, offscreen.width, offscreen.height);
+  let rgbaData = new Uint8Array(imgData.data.buffer);
+
+  // Resize if API image differs from target size
+  if (offscreen.width !== targetWidth || offscreen.height !== targetHeight) {
+    const resized = resampleBuffer(rgbaData, offscreen.width, offscreen.height, targetWidth, targetHeight);
+    if (resized) rgbaData = resized;
+  }
+
+  // Create layer and stamp image at offset
+  const idx = addLayer(newLayerId);
+  if (idx < 0) return false;
+
+  stampBufferOntoLayer(newLayerId, rgbaData, targetWidth, targetHeight, offsetX, offsetY);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------

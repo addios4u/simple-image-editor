@@ -4,7 +4,7 @@ import ViewerMode from './components/ViewerMode';
 import EditorMode from './components/EditorMode';
 import vscodeApi from './vscode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { initEngine, loadImage, loadOraData, requestRender, compositeToBytes, encodeLayerToPng } from './engine/engineContext';
+import { initEngine, loadImage, loadOraData, requestRender, compositeToBytes, encodeLayerToPng, applyAIImageAsLayer } from './engine/engineContext';
 import { writeOra } from './engine/openraster';
 import { useLayerStore } from './state/layerStore';
 import { loadWasmModule } from './engine/loadWasm';
@@ -137,7 +137,35 @@ const App: React.FC = () => {
                 if (error) {
                     aiStore.setError(error);
                 } else if (imageData) {
-                    aiStore.setResult(imageData);
+                    const ctx = aiStore.generationContext;
+                    if (!ctx) return;
+
+                    try {
+                        // Create new layer in UI store
+                        const layerStore = useLayerStore.getState();
+                        layerStore.addLayer();
+                        const layers = useLayerStore.getState().layers;
+                        const newLayer = layers[layers.length - 1];
+                        if (!newLayer) return;
+
+                        // Decode, resize, and stamp onto WASM layer
+                        const ok = await applyAIImageAsLayer(
+                            imageData, newLayer.id,
+                            ctx.targetWidth, ctx.targetHeight,
+                            ctx.selectionX, ctx.selectionY,
+                        );
+
+                        if (ok) {
+                            layerStore.setActiveLayer(newLayer.id);
+                            layerStore.bumpThumbnailVersion();
+                            useHistoryStore.getState().pushEdit('AI Generate');
+                            requestRender();
+                        }
+                    } catch (e) {
+                        aiStore.setError(`Failed to apply AI image: ${e}`);
+                    } finally {
+                        aiStore.setGenerationContext(null);
+                    }
                 }
             }
 
