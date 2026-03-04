@@ -76,12 +76,21 @@ pub struct Layer {
     pub offset_y: i32,
 }
 
+/// Temporary floating layer for selection-move operations.
+/// Not part of the regular layer stack — invisible to layer_count().
+struct FloatingLayer {
+    buffer: PixelBuffer,
+    offset_x: i32,
+    offset_y: i32,
+}
+
 /// Composites multiple layers into a single output PixelBuffer.
 #[wasm_bindgen]
 pub struct LayerCompositor {
     width: u32,
     height: u32,
     layers: Vec<Layer>,
+    floating: Option<FloatingLayer>,
 }
 
 #[wasm_bindgen]
@@ -93,6 +102,7 @@ impl LayerCompositor {
             width,
             height,
             layers: Vec::new(),
+            floating: None,
         }
     }
 
@@ -290,6 +300,138 @@ impl LayerCompositor {
         }
     }
 
+    // -----------------------------------------------------------------
+    // Masked pixel extraction & floating layer
+    // -----------------------------------------------------------------
+
+    /// Extract pixels from a layer where mask[y*width + x] != 0.
+    /// Returns a new PixelBuffer containing only the masked pixels.
+    /// The masked pixels in the source layer are cleared to transparent.
+    /// Mask must be exactly width*height bytes.
+    pub fn extract_masked_pixels(&mut self, layer_index: usize, mask: &[u8]) -> PixelBuffer {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        let mut result = PixelBuffer::new(self.width, self.height);
+
+        if mask.len() != w * h {
+            return result;
+        }
+
+        if let Some(layer) = self.layers.get_mut(layer_index) {
+            let src = layer.buffer.raw_data_mut();
+            let dst = result.raw_data_mut();
+
+            for i in 0..(w * h) {
+                if mask[i] != 0 {
+                    let px = i * 4;
+                    dst[px]     = src[px];
+                    dst[px + 1] = src[px + 1];
+                    dst[px + 2] = src[px + 2];
+                    dst[px + 3] = src[px + 3];
+                    src[px]     = 0;
+                    src[px + 1] = 0;
+                    src[px + 2] = 0;
+                    src[px + 3] = 0;
+                }
+            }
+        }
+        result
+    }
+
+    /// Stamp pixel data onto a layer at the given offset with alpha compositing.
+    /// src_data must be src_width * src_height * 4 bytes (RGBA).
+    pub fn stamp_buffer_onto_layer(
+        &mut self,
+        layer_index: usize,
+        src_data: &[u8],
+        src_width: u32,
+        src_height: u32,
+        offset_x: i32,
+        offset_y: i32,
+    ) {
+        let expected = (src_width * src_height * 4) as usize;
+        if src_data.len() != expected {
+            return;
+        }
+
+        if let Some(layer) = self.layers.get_mut(layer_index) {
+            let dst = layer.buffer.raw_data_mut();
+            let dw = self.width as i32;
+            let dh = self.height as i32;
+
+            for sy in 0..src_height as i32 {
+                for sx in 0..src_width as i32 {
+                    let dx = sx + offset_x;
+                    let dy = sy + offset_y;
+                    if dx < 0 || dx >= dw || dy < 0 || dy >= dh {
+                        continue;
+                    }
+
+                    let si = (sy as usize * src_width as usize + sx as usize) * 4;
+                    let sa = src_data[si + 3];
+                    if sa == 0 {
+                        continue;
+                    }
+
+                    let di = (dy as usize * self.width as usize + dx as usize) * 4;
+
+                    if sa == 255 {
+                        dst[di]     = src_data[si];
+                        dst[di + 1] = src_data[si + 1];
+                        dst[di + 2] = src_data[si + 2];
+                        dst[di + 3] = 255;
+                    } else {
+                        let sf = sa as f32 / 255.0;
+                        let df = dst[di + 3] as f32 / 255.0;
+                        let out_a = sf + df * (1.0 - sf);
+                        if out_a > 0.0 {
+                            for c in 0..3 {
+                                let s = src_data[si + c] as f32 / 255.0;
+                                let d = dst[di + c] as f32 / 255.0;
+                                dst[di + c] =
+                                    ((s * sf + d * df * (1.0 - sf)) / out_a * 255.0 + 0.5) as u8;
+                            }
+                            dst[di + 3] = (out_a * 255.0 + 0.5) as u8;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Set a floating layer from raw RGBA data. Used during selection-move drag.
+    pub fn set_floating_layer(&mut self, data: &[u8], width: u32, height: u32) {
+        let expected = (width * height * 4) as usize;
+        if data.len() != expected {
+            return;
+        }
+        let mut buffer = PixelBuffer::new(width, height);
+        buffer.raw_data_mut().copy_from_slice(data);
+        self.floating = Some(FloatingLayer {
+            buffer,
+            offset_x: 0,
+            offset_y: 0,
+        });
+    }
+
+    /// Update the floating layer's offset.
+    pub fn set_floating_offset(&mut self, x: i32, y: i32) {
+        if let Some(ref mut f) = self.floating {
+            f.offset_x = x;
+            f.offset_y = y;
+        }
+    }
+
+    /// Remove the floating layer.
+    pub fn clear_floating_layer(&mut self) {
+        self.floating = None;
+    }
+
+    /// Check whether a floating layer exists.
+    pub fn has_floating_layer(&self) -> bool {
+        self.floating.is_some()
+    }
+
     /// Composite all visible layers into a new PixelBuffer (normal blend, alpha).
     pub fn composite(&self) -> PixelBuffer {
         let mut out = PixelBuffer::new(self.width, self.height);
@@ -349,6 +491,51 @@ impl LayerCompositor {
                 }
             }
         }
+
+        // Render floating layer on top (Normal blend, full opacity)
+        if let Some(ref floating) = self.floating {
+            let src_data = floating.buffer.raw_data();
+            let out_data = out.raw_data_mut();
+            let fw = floating.buffer.width() as i32;
+            let fh = floating.buffer.height() as i32;
+
+            for dy in 0..h {
+                for dx in 0..w {
+                    let sx = dx - floating.offset_x;
+                    let sy = dy - floating.offset_y;
+
+                    if sx < 0 || sx >= fw || sy < 0 || sy >= fh {
+                        continue;
+                    }
+
+                    let src_base = (sy as usize * fw as usize + sx as usize) * 4;
+                    let sa = src_data[src_base + 3] as f32 / 255.0;
+                    if sa == 0.0 {
+                        continue;
+                    }
+
+                    let dst_base = (dy as usize * self.width as usize + dx as usize) * 4;
+
+                    let sr = src_data[src_base] as f32 / 255.0;
+                    let sg = src_data[src_base + 1] as f32 / 255.0;
+                    let sb = src_data[src_base + 2] as f32 / 255.0;
+
+                    let dr = out_data[dst_base] as f32 / 255.0;
+                    let dg = out_data[dst_base + 1] as f32 / 255.0;
+                    let db = out_data[dst_base + 2] as f32 / 255.0;
+                    let da = out_data[dst_base + 3] as f32 / 255.0;
+
+                    let out_a = sa + da * (1.0 - sa);
+                    if out_a > 0.0 {
+                        out_data[dst_base]     = ((sr * sa + dr * da * (1.0 - sa)) / out_a * 255.0 + 0.5) as u8;
+                        out_data[dst_base + 1] = ((sg * sa + dg * da * (1.0 - sa)) / out_a * 255.0 + 0.5) as u8;
+                        out_data[dst_base + 2] = ((sb * sa + db * da * (1.0 - sa)) / out_a * 255.0 + 0.5) as u8;
+                        out_data[dst_base + 3] = (out_a * 255.0 + 0.5) as u8;
+                    }
+                }
+            }
+        }
+
         out
     }
 }

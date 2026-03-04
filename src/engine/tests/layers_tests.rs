@@ -558,3 +558,288 @@ fn test_composite_with_offset() {
     let r3 = (p30 >> 24) & 0xFF;
     assert!(r3 >= 254, "x=3 should still be red, got r={}", r3);
 }
+
+// --- Masked pixel extraction tests ---
+
+#[test]
+fn test_extract_masked_pixels_full_mask() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let idx = comp.add_layer();
+    comp.fill_rect_layer(idx, 0, 0, 2, 2, 0xFF0000FF); // all red
+
+    // Full mask: all pixels selected
+    let mask = vec![255u8; 2 * 2];
+    let extracted = comp.extract_masked_pixels(idx, &mask);
+
+    // Extracted buffer should contain the red pixels
+    assert_eq!(extracted.width(), 2);
+    assert_eq!(extracted.height(), 2);
+    assert_eq!(extracted.get_pixel(0, 0), 0xFF0000FF);
+    assert_eq!(extracted.get_pixel(1, 1), 0xFF0000FF);
+
+    // Source layer should be cleared to transparent
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(0, 0), 0x00000000);
+    assert_eq!(buf.get_pixel(1, 1), 0x00000000);
+}
+
+#[test]
+fn test_extract_masked_pixels_partial_mask() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+    comp.fill_rect_layer(idx, 0, 0, 4, 4, 0x00FF00FF); // all green
+
+    // Mask: only top-left 2x2
+    let mut mask = vec![0u8; 4 * 4];
+    for y in 0..2 {
+        for x in 0..2 {
+            mask[y * 4 + x] = 255;
+        }
+    }
+    let extracted = comp.extract_masked_pixels(idx, &mask);
+
+    // Extracted: top-left has green, bottom-right is transparent
+    assert_eq!(extracted.get_pixel(0, 0), 0x00FF00FF);
+    assert_eq!(extracted.get_pixel(1, 1), 0x00FF00FF);
+    assert_eq!(extracted.get_pixel(2, 2), 0x00000000);
+    assert_eq!(extracted.get_pixel(3, 3), 0x00000000);
+
+    // Source: top-left cleared, bottom-right still green
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(0, 0), 0x00000000);
+    assert_eq!(buf.get_pixel(1, 1), 0x00000000);
+    assert_eq!(buf.get_pixel(2, 2), 0x00FF00FF);
+    assert_eq!(buf.get_pixel(3, 3), 0x00FF00FF);
+}
+
+#[test]
+fn test_extract_masked_pixels_empty_mask() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let idx = comp.add_layer();
+    comp.fill_rect_layer(idx, 0, 0, 2, 2, 0xFF0000FF);
+
+    let mask = vec![0u8; 2 * 2]; // all zero
+    let extracted = comp.extract_masked_pixels(idx, &mask);
+
+    // Nothing extracted
+    assert_eq!(extracted.get_pixel(0, 0), 0x00000000);
+
+    // Source unchanged
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(0, 0), 0xFF0000FF);
+}
+
+#[test]
+fn test_extract_masked_pixels_invalid_index() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let mask = vec![255u8; 2 * 2];
+    let extracted = comp.extract_masked_pixels(99, &mask);
+    // Returns empty buffer
+    assert_eq!(extracted.get_pixel(0, 0), 0x00000000);
+}
+
+#[test]
+fn test_extract_masked_pixels_wrong_mask_size() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+    comp.fill_rect_layer(idx, 0, 0, 4, 4, 0xFF0000FF);
+
+    let mask = vec![255u8; 3]; // wrong size
+    let extracted = comp.extract_masked_pixels(idx, &mask);
+
+    // Returns empty, source untouched
+    assert_eq!(extracted.get_pixel(0, 0), 0x00000000);
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(0, 0), 0xFF0000FF);
+}
+
+// --- stamp_buffer_onto_layer tests ---
+
+#[test]
+fn test_stamp_buffer_onto_layer_basic() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+    // Layer starts transparent
+
+    // Source: 2x2 red pixels (RGBA bytes)
+    let mut src_data = vec![0u8; 4 * 4 * 4]; // 4x4 canvas size
+    // Set pixel (1,1) to red
+    let offset = (1 * 4 + 1) * 4;
+    src_data[offset] = 255;     // R
+    src_data[offset + 1] = 0;   // G
+    src_data[offset + 2] = 0;   // B
+    src_data[offset + 3] = 255; // A
+
+    comp.stamp_buffer_onto_layer(idx, &src_data, 4, 4, 0, 0);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(1, 1), 0xFF0000FF);
+    assert_eq!(buf.get_pixel(0, 0), 0x00000000); // untouched
+}
+
+#[test]
+fn test_stamp_buffer_onto_layer_with_offset() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+
+    // Source: 4x4, pixel at (0,0) is blue
+    let mut src_data = vec![0u8; 4 * 4 * 4];
+    src_data[0] = 0;       // R
+    src_data[1] = 0;       // G
+    src_data[2] = 255;     // B
+    src_data[3] = 255;     // A
+
+    // Stamp with offset (2, 1) → pixel should appear at (2, 1)
+    comp.stamp_buffer_onto_layer(idx, &src_data, 4, 4, 2, 1);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(2, 1), 0x0000FFFF);
+    assert_eq!(buf.get_pixel(0, 0), 0x00000000);
+}
+
+#[test]
+fn test_stamp_buffer_onto_layer_negative_offset_clips() {
+    let mut comp = LayerCompositor::new(4, 4);
+    let idx = comp.add_layer();
+
+    // Source: 4x4, pixel at (3,3) is green
+    let mut src_data = vec![0u8; 4 * 4 * 4];
+    let offset = (3 * 4 + 3) * 4;
+    src_data[offset] = 0;
+    src_data[offset + 1] = 255;
+    src_data[offset + 2] = 0;
+    src_data[offset + 3] = 255;
+
+    // Stamp with offset (-2, -2) → pixel at src(3,3) should appear at (1,1)
+    comp.stamp_buffer_onto_layer(idx, &src_data, 4, 4, -2, -2);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    assert_eq!(buf.get_pixel(1, 1), 0x00FF00FF);
+    assert_eq!(buf.get_pixel(3, 3), 0x00000000);
+}
+
+#[test]
+fn test_stamp_buffer_alpha_composite() {
+    let mut comp = LayerCompositor::new(1, 1);
+    let idx = comp.add_layer();
+    // Set layer to solid red
+    comp.fill_rect_layer(idx, 0, 0, 1, 1, 0xFF0000FF);
+
+    // Source: semi-transparent blue (alpha=128)
+    let src_data = vec![0u8, 0, 255, 128]; // R=0, G=0, B=255, A=128
+
+    comp.stamp_buffer_onto_layer(idx, &src_data, 1, 1, 0, 0);
+
+    let buf = comp.get_layer_buffer_mut(idx).unwrap();
+    let pixel = buf.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let b = (pixel >> 8) & 0xFF;
+    let a = pixel & 0xFF;
+
+    // Semi-transparent blue over opaque red → blended result
+    // sa ~= 0.502, da = 1.0, out_a = 1.0
+    // out_b = (1.0*0.502 + 0*1.0*0.498)/1.0 ~= 0.502 → ~128
+    // out_r = (0*0.502 + 1.0*1.0*0.498)/1.0 ~= 0.498 → ~127
+    assert!((r as i32 - 127).abs() <= 3, "red should be ~127, got {}", r);
+    assert!((b as i32 - 128).abs() <= 3, "blue should be ~128, got {}", b);
+    assert!(a >= 254, "alpha should be ~255, got {}", a);
+}
+
+#[test]
+fn test_stamp_buffer_invalid_index() {
+    let mut comp = LayerCompositor::new(2, 2);
+    let src_data = vec![255u8; 2 * 2 * 4];
+    // Should not panic
+    comp.stamp_buffer_onto_layer(99, &src_data, 2, 2, 0, 0);
+}
+
+// --- Floating layer tests ---
+
+#[test]
+fn test_floating_layer_renders_in_composite() {
+    let mut comp = LayerCompositor::new(2, 2);
+    comp.add_layer(); // empty base layer
+
+    // Set floating layer: 2x2 with red at (0,0)
+    let mut data = vec![0u8; 2 * 2 * 4];
+    data[0] = 255; data[1] = 0; data[2] = 0; data[3] = 255; // red
+    comp.set_floating_layer(&data, 2, 2);
+
+    let result = comp.composite();
+    // Red should appear at (0,0)
+    assert_eq!(result.get_pixel(0, 0), 0xFF0000FF);
+    // Other pixels transparent
+    assert_eq!(result.get_pixel(1, 1), 0x00000000);
+}
+
+#[test]
+fn test_floating_layer_offset() {
+    let mut comp = LayerCompositor::new(4, 4);
+    comp.add_layer(); // empty base
+
+    // Floating: 4x4, red at (0,0) only
+    let mut data = vec![0u8; 4 * 4 * 4];
+    data[0] = 255; data[1] = 0; data[2] = 0; data[3] = 255;
+    comp.set_floating_layer(&data, 4, 4);
+    comp.set_floating_offset(2, 1);
+
+    let result = comp.composite();
+    // Red should appear at (2,1) due to offset
+    assert_eq!(result.get_pixel(2, 1), 0xFF0000FF);
+    // Original position should be empty
+    assert_eq!(result.get_pixel(0, 0), 0x00000000);
+}
+
+#[test]
+fn test_clear_floating_removes_from_composite() {
+    let mut comp = LayerCompositor::new(2, 2);
+    comp.add_layer();
+
+    let mut data = vec![0u8; 2 * 2 * 4];
+    data[0] = 255; data[3] = 255; // red at (0,0)
+    comp.set_floating_layer(&data, 2, 2);
+
+    // Verify it renders
+    let result1 = comp.composite();
+    assert_eq!(result1.get_pixel(0, 0), 0xFF0000FF);
+
+    // Clear and verify it's gone
+    comp.clear_floating_layer();
+    let result2 = comp.composite();
+    assert_eq!(result2.get_pixel(0, 0), 0x00000000);
+}
+
+#[test]
+fn test_floating_not_in_layer_count() {
+    let mut comp = LayerCompositor::new(2, 2);
+    comp.add_layer();
+    assert_eq!(comp.layer_count(), 1);
+
+    let data = vec![0u8; 2 * 2 * 4];
+    comp.set_floating_layer(&data, 2, 2);
+    // layer_count should still be 1
+    assert_eq!(comp.layer_count(), 1);
+
+    assert!(comp.has_floating_layer());
+    comp.clear_floating_layer();
+    assert!(!comp.has_floating_layer());
+}
+
+#[test]
+fn test_floating_layer_composites_over_all_layers() {
+    let mut comp = LayerCompositor::new(1, 1);
+    let idx = comp.add_layer();
+    comp.fill_rect_layer(idx, 0, 0, 1, 1, 0xFF0000FF); // red base
+
+    // Floating: opaque blue
+    let data = vec![0u8, 0, 255, 255]; // blue
+    comp.set_floating_layer(&data, 1, 1);
+
+    let result = comp.composite();
+    let pixel = result.get_pixel(0, 0);
+    let r = (pixel >> 24) & 0xFF;
+    let b = (pixel >> 8) & 0xFF;
+    // Blue floating over red base → blue wins
+    assert!(r <= 1, "red should be ~0, got {}", r);
+    assert!(b >= 254, "blue should be ~255, got {}", b);
+}
