@@ -84,6 +84,33 @@ function hexToRgba(hex: string): [number, number, number, number] {
   return [r, g, b, 255];
 }
 
+/**
+ * 캔버스 좌표계 마스크를 레이어-로컬 좌표계로 변환.
+ * 레이어가 (offsetX, offsetY)만큼 이동된 경우, 레이어 픽셀 (lx, ly)에
+ * 해당하는 캔버스 픽셀은 (lx + offsetX, ly + offsetY)이다.
+ */
+function adjustMaskForOffset(
+  canvasMask: Uint8Array,
+  canvasW: number,
+  canvasH: number,
+  offsetX: number,
+  offsetY: number,
+): Uint8Array {
+  if (offsetX === 0 && offsetY === 0) return canvasMask;
+  const layerMask = new Uint8Array(canvasW * canvasH);
+  for (let ly = 0; ly < canvasH; ly++) {
+    const cx0 = offsetX;
+    const cy = ly + offsetY;
+    if (cy < 0 || cy >= canvasH) continue;
+    for (let lx = 0; lx < canvasW; lx++) {
+      const cx = lx + cx0;
+      if (cx < 0 || cx >= canvasW) continue;
+      layerMask[ly * canvasW + lx] = canvasMask[cy * canvasW + cx];
+    }
+  }
+  return layerMask;
+}
+
 const marqueeConfig: MarqueeToolConfig = {
   setSelection: (rect) => useEditorStore.getState().setSelection(rect),
   getSelectionShape: () => useEditorStore.getState().selectionShape,
@@ -202,6 +229,7 @@ const Canvas: React.FC = () => {
   const pendingMaskRef = useRef<Uint8Array | null>(null);
   const pendingLayerIdRef = useRef<string | null>(null);
   const pendingSelectionRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const pendingOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const antsOffsetRef = useRef(0);
   const antsRafRef = useRef<number>(0);
   const internalClipboardBlobRef = useRef<Blob | null>(null);
@@ -549,17 +577,21 @@ const Canvas: React.FC = () => {
             const maskData = pendingMaskRef.current;
             const layerId = pendingLayerIdRef.current;
             const sel = pendingSelectionRef.current;
+            const off = pendingOffsetRef.current;
             if (!maskData || !layerId || !sel) return;
             try {
               const [r, g, b] = hexToRgba(result.color);
               const a = Math.round((result.opacity / 100) * 255);
               const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
-              const before = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              const lx = sel.x - off.x;
+              const ly = sel.y - off.y;
+              const before = captureLayerRegion(layerId, lx, ly, sel.width, sel.height);
               if (!before) return;
               const entryId = pushEditWithSnapshot('Fill Selection', layerId, before,
-                { x: sel.x, y: sel.y, w: sel.width, h: sel.height });
-              fillMaskedPixels(layerId, maskData, r, g, b, a);
-              const after = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+                { x: lx, y: ly, w: sel.width, h: sel.height });
+              const adjMask = adjustMaskForOffset(maskData, canvasWidth, canvasHeight, off.x, off.y);
+              fillMaskedPixels(layerId, adjMask, r, g, b, a);
+              const after = captureLayerRegion(layerId, lx, ly, sel.width, sel.height);
               if (after) commitSnapshot(entryId, after);
               useEditorStore.getState().setFillColor(result.color);
               useLayerStore.getState().bumpThumbnailVersion();
@@ -578,16 +610,20 @@ const Canvas: React.FC = () => {
             const maskData = pendingMaskRef.current;
             const layerId = pendingLayerIdRef.current;
             const sel = pendingSelectionRef.current;
+            const off = pendingOffsetRef.current;
             if (!maskData || !layerId || !sel) return;
             try {
               const [r, g, b, a] = hexToRgba(result.color);
               const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
-              const before = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+              const lx = sel.x - off.x;
+              const ly = sel.y - off.y;
+              const before = captureLayerRegion(layerId, lx, ly, sel.width, sel.height);
               if (!before) return;
               const entryId = pushEditWithSnapshot('Stroke Selection', layerId, before,
-                { x: sel.x, y: sel.y, w: sel.width, h: sel.height });
-              strokeMaskedBoundary(layerId, maskData, r, g, b, a, result.width);
-              const after = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
+                { x: lx, y: ly, w: sel.width, h: sel.height });
+              const adjMask = adjustMaskForOffset(maskData, canvasWidth, canvasHeight, off.x, off.y);
+              strokeMaskedBoundary(layerId, adjMask, r, g, b, a, result.width);
+              const after = captureLayerRegion(layerId, lx, ly, sel.width, sel.height);
               if (after) commitSnapshot(entryId, after);
               useEditorStore.getState().setStrokeColor(result.color);
               useEditorStore.getState().setStrokeWidth(result.width);
@@ -670,18 +706,20 @@ const Canvas: React.FC = () => {
               }
               case 'clear': {
                 if (!maskData || !activeLayerId || !selection) break;
-                const before = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
+                const clearLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
+                const clearOffX = clearLayer?.offsetX ?? 0;
+                const clearOffY = clearLayer?.offsetY ?? 0;
+                const clearLx = selection.x - clearOffX;
+                const clearLy = selection.y - clearOffY;
+                const before = captureLayerRegion(activeLayerId, clearLx, clearLy, selection.width, selection.height);
                 if (!before) break;
                 const entryId = pushEditWithSnapshot(
                   'Clear Selection', activeLayerId, before,
-                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
+                  { x: clearLx, y: clearLy, w: selection.width, h: selection.height },
                 );
-                clearMaskedPixels(activeLayerId, maskData);
-                const after = captureLayerRegion(
-                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
-                );
+                const clearAdjMask = adjustMaskForOffset(maskData, canvasWidth, canvasHeight, clearOffX, clearOffY);
+                clearMaskedPixels(activeLayerId, clearAdjMask);
+                const after = captureLayerRegion(activeLayerId, clearLx, clearLy, selection.width, selection.height);
                 if (after) commitSnapshot(entryId, after);
                 useLayerStore.getState().bumpThumbnailVersion();
                 requestRender();
@@ -689,17 +727,21 @@ const Canvas: React.FC = () => {
               }
               case 'fill': {
                 if (!maskData || !activeLayerId || !selection) break;
+                const fillLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
                 pendingMaskRef.current = new Uint8Array(maskData);
                 pendingLayerIdRef.current = activeLayerId;
                 pendingSelectionRef.current = { ...selection };
+                pendingOffsetRef.current = { x: fillLayer?.offsetX ?? 0, y: fillLayer?.offsetY ?? 0 };
                 setFillDialogOpen(true);
                 break;
               }
               case 'stroke': {
                 if (!maskData || !activeLayerId || !selection) break;
+                const strokeLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
                 pendingMaskRef.current = new Uint8Array(maskData);
                 pendingLayerIdRef.current = activeLayerId;
                 pendingSelectionRef.current = { ...selection };
+                pendingOffsetRef.current = { x: strokeLayer?.offsetX ?? 0, y: strokeLayer?.offsetY ?? 0 };
                 setStrokeDialogOpen(true);
                 break;
               }
