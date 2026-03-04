@@ -1,4 +1,5 @@
 import { BaseTool, type PointerEvent, type Point } from './BaseTool';
+import type { WasmRegionSnapshot } from '../engine/wasmBridge';
 
 /**
  * Dependency-injection config that connects BrushTool to the WASM engine.
@@ -15,6 +16,10 @@ export interface BrushToolConfig {
     color: number, size: number, hardness: number,
   ) => void;
   requestRender: () => void;
+  getCanvasSize?: () => { width: number; height: number };
+  captureLayerRegion?: (layerId: string, x: number, y: number, w: number, h: number) => WasmRegionSnapshot | null;
+  pushEditWithSnapshot?: (label: string, layerId: string, before: WasmRegionSnapshot, region: { x: number; y: number; w: number; h: number }) => string;
+  commitSnapshot?: (entryId: string, after: WasmRegionSnapshot) => void;
 }
 
 export class BrushTool extends BaseTool {
@@ -27,6 +32,7 @@ export class BrushTool extends BaseTool {
   private strokePoints: Point[] = [];
   private lastPoint: Point | null = null;
   private config: BrushToolConfig | null;
+  private _strokeHistoryId: string | null = null;
 
   constructor(config?: BrushToolConfig) {
     super();
@@ -41,6 +47,20 @@ export class BrushTool extends BaseTool {
     this.isDrawing = true;
     this.strokePoints = [{ x: e.x, y: e.y }];
     this.lastPoint = { x: e.x, y: e.y };
+    this._strokeHistoryId = null;
+
+    if (this.config && !this.config.isLayerLocked()) {
+      const layerId = this.config.getActiveLayerId();
+      const size = this.config.getCanvasSize?.() ?? { width: 0, height: 0 };
+      const before = this.config.captureLayerRegion?.(layerId, 0, 0, size.width, size.height) ?? null;
+      if (before && this.config.pushEditWithSnapshot) {
+        this._strokeHistoryId = this.config.pushEditWithSnapshot(
+          'Brush Stroke', layerId, before,
+          { x: 0, y: 0, w: size.width, h: size.height },
+        );
+      }
+    }
+
     this.applyBrush(e.x, e.y);
   }
 
@@ -67,6 +87,16 @@ export class BrushTool extends BaseTool {
   onPointerUp(_e: PointerEvent): void {
     this.isDrawing = false;
     this.lastPoint = null;
+
+    if (this._strokeHistoryId && this.config) {
+      const layerId = this.config.getActiveLayerId();
+      const size = this.config.getCanvasSize?.() ?? { width: 0, height: 0 };
+      const after = this.config.captureLayerRegion?.(layerId, 0, 0, size.width, size.height) ?? null;
+      if (after) {
+        this.config.commitSnapshot?.(this._strokeHistoryId, after);
+      }
+      this._strokeHistoryId = null;
+    }
   }
 
   getStrokePoints(): Point[] {
@@ -77,6 +107,7 @@ export class BrushTool extends BaseTool {
     this.isDrawing = false;
     this.strokePoints = [];
     this.lastPoint = null;
+    this._strokeHistoryId = null;
   }
 
   private applyBrush(cx: number, cy: number): void {

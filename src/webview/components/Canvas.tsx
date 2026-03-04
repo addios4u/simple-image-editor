@@ -41,6 +41,15 @@ const brushConfig: BrushToolConfig = {
   },
   brushStrokeLayer,
   requestRender,
+  getCanvasSize: () => ({
+    width: useEditorStore.getState().canvasWidth,
+    height: useEditorStore.getState().canvasHeight,
+  }),
+  captureLayerRegion,
+  pushEditWithSnapshot: (label, layerId, before, region) =>
+    useHistoryStore.getState().pushEditWithSnapshot(label, layerId, before, region),
+  commitSnapshot: (entryId, after) =>
+    useHistoryStore.getState().commitSnapshot(entryId, after),
 };
 
 const moveConfig: MoveToolConfig = {
