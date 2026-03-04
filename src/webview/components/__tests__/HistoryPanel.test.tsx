@@ -15,9 +15,9 @@ describe('HistoryPanel', () => {
     useHistoryStore.getState()._resetCounter();
   });
 
-  it('renders "History" title', () => {
+  it('renders history panel', () => {
     render(<HistoryPanel />);
-    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByTestId('history-panel')).toBeInTheDocument();
   });
 
   it('renders list of history entries', () => {
@@ -77,5 +77,11 @@ describe('HistoryPanel', () => {
     render(<HistoryPanel />);
     const redoBtn = screen.getByRole('button', { name: /redo/i });
     expect(redoBtn).toBeDisabled();
+  });
+
+  it('shows delete and snapshot buttons', () => {
+    render(<HistoryPanel />);
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /snapshot/i })).toBeInTheDocument();
   });
 });

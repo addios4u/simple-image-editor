@@ -30,7 +30,7 @@ describe('PropertyPanel', () => {
       strokeColor: '#000000',
       canvasWidth: 800,
       canvasHeight: 600,
-      activeTab: 'properties',
+      activeTab: 'layers',
     });
   });
 

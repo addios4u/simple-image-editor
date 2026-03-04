@@ -20,10 +20,10 @@ describe('SidebarTabs', () => {
     });
   });
 
-  it('renders three tabs: Layers, Properties, AI', () => {
+  it('renders three tabs: Layers, History, AI', () => {
     render(<SidebarTabs />);
     expect(screen.getByRole('tab', { name: /layers/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /properties/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /ai/i })).toBeInTheDocument();
   });
 
@@ -35,10 +35,10 @@ describe('SidebarTabs', () => {
 
   it('clicking tab switches content', () => {
     render(<SidebarTabs />);
-    const propertiesTab = screen.getByRole('tab', { name: /properties/i });
+    const historyTab = screen.getByRole('tab', { name: /history/i });
 
-    fireEvent.click(propertiesTab);
-    expect(propertiesTab.getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(historyTab);
+    expect(historyTab.getAttribute('aria-selected')).toBe('true');
 
     const layersTab = screen.getByRole('tab', { name: /layers/i });
     expect(layersTab.getAttribute('aria-selected')).toBe('false');
@@ -50,9 +50,9 @@ describe('SidebarTabs', () => {
     // Default is Layers tab
     expect(screen.getByTestId('layer-panel')).toBeInTheDocument();
 
-    // Switch to Properties
-    fireEvent.click(screen.getByRole('tab', { name: /properties/i }));
-    expect(screen.getByTestId('property-panel')).toBeInTheDocument();
+    // Switch to History
+    fireEvent.click(screen.getByRole('tab', { name: /history/i }));
+    expect(screen.getByTestId('history-panel')).toBeInTheDocument();
 
     // Switch to AI
     fireEvent.click(screen.getByRole('tab', { name: /ai/i }));

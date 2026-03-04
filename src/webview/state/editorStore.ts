@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export type EditorMode = 'viewer' | 'editor';
 export type ToolType = 'move' | 'select' | 'brush' | 'text';
-export type SidebarTab = 'layers' | 'properties' | 'ai';
+export type SidebarTab = 'layers' | 'history' | 'ai';
 export type SelectionShape = 'rectangle' | 'ellipse';
 
 export interface SelectionRect {

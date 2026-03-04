@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore, type SidebarTab } from '../state/editorStore';
 import LayerPanel from './LayerPanel';
-import PropertyPanel from './PropertyPanel';
+import HistoryPanel from './HistoryPanel';
 import AIPanel from './AIPanel';
 
 interface TabDef {
@@ -11,13 +11,13 @@ interface TabDef {
 
 const tabs: TabDef[] = [
   { id: 'layers', label: 'Layers' },
-  { id: 'properties', label: 'Properties' },
+  { id: 'history', label: 'History' },
   { id: 'ai', label: 'AI' },
 ];
 
 const panelMap: Record<SidebarTab, React.FC> = {
   layers: LayerPanel,
-  properties: PropertyPanel,
+  history: HistoryPanel,
   ai: AIPanel,
 };
 

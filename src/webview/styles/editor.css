@@ -1026,24 +1026,34 @@ canvas {
 }
 
 /* History panel */
-.history-actions {
+.history-panel {
   display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  height: 100%;
 }
 
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .history-entry {
-  padding: 4px 8px;
-  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.history-entry svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 .history-entry:hover {
@@ -1051,19 +1061,69 @@ canvas {
 }
 
 .history-entry.active {
-  background: var(--accent);
+  background: #2d5f8a;
+  color: #fff;
+}
+
+.history-entry.active svg {
   color: #fff;
 }
 
 .history-entry.dimmed {
-  color: var(--text-secondary);
-  opacity: 0.6;
+  opacity: 0.35;
 }
 
 .history-entry-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.history-divider {
+  height: 1px;
+  background: #1a1a1a;
+  flex-shrink: 0;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 36px;
+  background: var(--bg-secondary);
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.history-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.history-action-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.history-action-btn:disabled {
+  color: var(--text-secondary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.history-action-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
 }
 
 /* --- Marching Ants Selection --- */
