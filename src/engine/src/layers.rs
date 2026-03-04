@@ -590,13 +590,27 @@ impl LayerCompositor {
         }
         if let Some(layer) = self.layers.get_mut(layer_idx) {
             let data = layer.buffer.raw_data_mut();
+            let src_a = a as f32 / 255.0;
             for i in 0..(w * h) {
                 if mask[i] != 0 {
                     let px = i * 4;
-                    data[px]     = r;
-                    data[px + 1] = g;
-                    data[px + 2] = b;
-                    data[px + 3] = a;
+                    if a == 255 {
+                        // 완전 불투명: 직접 교체 (빠른 경로)
+                        data[px]     = r;
+                        data[px + 1] = g;
+                        data[px + 2] = b;
+                        data[px + 3] = 255;
+                    } else {
+                        // 부분 투명: Porter-Duff src-over 합성
+                        let dst_a = data[px + 3] as f32 / 255.0;
+                        let out_a = src_a + dst_a * (1.0 - src_a);
+                        if out_a > 0.0 {
+                            data[px]     = ((r as f32 * src_a + data[px]     as f32 * dst_a * (1.0 - src_a)) / out_a) as u8;
+                            data[px + 1] = ((g as f32 * src_a + data[px + 1] as f32 * dst_a * (1.0 - src_a)) / out_a) as u8;
+                            data[px + 2] = ((b as f32 * src_a + data[px + 2] as f32 * dst_a * (1.0 - src_a)) / out_a) as u8;
+                            data[px + 3] = (out_a * 255.0) as u8;
+                        }
+                    }
                 }
             }
         }

@@ -437,7 +437,10 @@ const Canvas: React.FC = () => {
                     }
                   }
                 } catch (e) {
-                  console.warn('System clipboard read failed, trying internal clipboard:', e);
+                  console.warn('System clipboard read failed:', e);
+                }
+                // 시스템 클립보드에 이미지 없으면 내부 클립보드 사용
+                if (!blobToPaste) {
                   blobToPaste = internalClipboardBlobRef.current;
                 }
                 if (!blobToPaste) break;

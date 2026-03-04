@@ -526,16 +526,20 @@ export async function pasteImageAsNewLayer(
   if (!compositor || !wasmMemory) return false;
 
   const bitmap = await createImageBitmap(blob);
-  const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+  // 항상 캔버스 크기로 레이어 생성 (붙여넣기 이미지가 다른 크기여도 동일 크기 유지)
+  const targetW = canvasWidth > 0 ? canvasWidth : bitmap.width;
+  const targetH = canvasHeight > 0 ? canvasHeight : bitmap.height;
+  const offscreen = new OffscreenCanvas(targetW, targetH);
   const ctx2 = offscreen.getContext('2d');
   if (!ctx2) {
     bitmap.close();
     return false;
   }
+  // 이미지를 좌상단에 그림 (캔버스보다 크면 그대로, 작으면 남은 영역은 투명)
   ctx2.drawImage(bitmap, 0, 0);
   bitmap.close();
 
-  const imageData = ctx2.getImageData(0, 0, offscreen.width, offscreen.height);
+  const imageData = ctx2.getImageData(0, 0, targetW, targetH);
   const idx = addLayer(newLayerId);
   if (idx < 0) return false;
 
