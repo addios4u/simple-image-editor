@@ -661,8 +661,20 @@ const Canvas: React.FC = () => {
 
     if (layerId) {
       // 기존 텍스트 레이어 갱신
+      const { canvasWidth, canvasHeight } = useEditorStore.getState();
+      const before = captureLayerRegion(layerId, 0, 0, canvasWidth, canvasHeight);
+      const entryId = before
+        ? useHistoryStore.getState().pushEditWithSnapshot(
+            'Edit Text', layerId, before,
+            { x: 0, y: 0, w: canvasWidth, h: canvasHeight },
+          )
+        : null;
       renderTextToLayer(layerId, textData, fillColor);
       useLayerStore.getState().setLayerTextData(layerId, textData);
+      if (entryId) {
+        const after = captureLayerRegion(layerId, 0, 0, canvasWidth, canvasHeight);
+        if (after) useHistoryStore.getState().commitSnapshot(entryId, after);
+      }
     } else {
       // 새 텍스트 레이어 생성
       useLayerStore.getState().addLayer();
@@ -672,6 +684,7 @@ const Canvas: React.FC = () => {
       renderTextToLayer(newLayer.id, textData, fillColor);
       useLayerStore.getState().setLayerTextData(newLayer.id, textData);
       useLayerStore.getState().setActiveLayer(newLayer.id);
+      useHistoryStore.getState().pushEdit('Add Text');
     }
 
     useLayerStore.getState().bumpThumbnailVersion();
