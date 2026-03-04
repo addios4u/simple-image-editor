@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useHistoryStore } from './historyStore';
 
 export interface TextData {
   text: string;
@@ -32,6 +33,7 @@ interface LayerState {
   removeLayer: (id: string) => void;
   setLayerVisibility: (id: string, visible: boolean) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
+  commitLayerOpacity: (id: string, prevOpacity: number, newOpacity: number) => void;
   setLayerLocked: (id: string, locked: boolean) => void;
   setLayerBlendMode: (id: string, blendMode: string) => void;
   setLayerOffset: (id: string, x: number, y: number) => void;
@@ -72,12 +74,17 @@ export const useLayerStore = create<LayerState>((set, get) => ({
       return { layers, activeLayerId };
     }),
 
-  setLayerVisibility: (id, visible) =>
+  setLayerVisibility: (id, visible) => {
+    const prev = get().layers.find((l) => l.id === id)?.visible ?? true;
     set((state) => ({
-      layers: state.layers.map((l) =>
-        l.id === id ? { ...l, visible } : l,
-      ),
-    })),
+      layers: state.layers.map((l) => l.id === id ? { ...l, visible } : l),
+    }));
+    useHistoryStore.getState().pushEditWithAction(
+      'Layer Visibility',
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, visible: prev } : l) })),
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, visible } : l) })),
+    );
+  },
 
   setLayerOpacity: (id, opacity) =>
     set((state) => ({
@@ -86,6 +93,14 @@ export const useLayerStore = create<LayerState>((set, get) => ({
       ),
     })),
 
+  commitLayerOpacity: (id, prevOpacity, newOpacity) => {
+    useHistoryStore.getState().pushEditWithAction(
+      'Layer Opacity',
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, opacity: prevOpacity } : l) })),
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, opacity: newOpacity } : l) })),
+    );
+  },
+
   setLayerLocked: (id, locked) =>
     set((state) => ({
       layers: state.layers.map((l) =>
@@ -93,12 +108,17 @@ export const useLayerStore = create<LayerState>((set, get) => ({
       ),
     })),
 
-  setLayerBlendMode: (id, blendMode) =>
+  setLayerBlendMode: (id, blendMode) => {
+    const prev = get().layers.find((l) => l.id === id)?.blendMode ?? 'Normal';
     set((state) => ({
-      layers: state.layers.map((l) =>
-        l.id === id ? { ...l, blendMode } : l,
-      ),
-    })),
+      layers: state.layers.map((l) => l.id === id ? { ...l, blendMode } : l),
+    }));
+    useHistoryStore.getState().pushEditWithAction(
+      'Layer Blend Mode',
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, blendMode: prev } : l) })),
+      () => set((state) => ({ layers: state.layers.map((l) => l.id === id ? { ...l, blendMode } : l) })),
+    );
+  },
 
   setLayerOffset: (id, x, y) =>
     set((state) => ({

@@ -78,6 +78,7 @@ const LayerPanel: React.FC = () => {
   const setActiveLayer = useLayerStore((s) => s.setActiveLayer);
   const setLayerVisibility = useLayerStore((s) => s.setLayerVisibility);
   const setLayerOpacity = useLayerStore((s) => s.setLayerOpacity);
+  const commitLayerOpacity = useLayerStore((s) => s.commitLayerOpacity);
   const setLayerLocked = useLayerStore((s) => s.setLayerLocked);
   const setLayerBlendMode = useLayerStore((s) => s.setLayerBlendMode);
   const reorderLayers = useLayerStore((s) => s.reorderLayers);
@@ -87,6 +88,7 @@ const LayerPanel: React.FC = () => {
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
   const opacityRowRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
+  const opacityBeforeEdit = useRef<number | null>(null);
 
   const handlePointerDown = useCallback((e: React.PointerEvent, layerId: string) => {
     // Only left button
@@ -183,6 +185,16 @@ const LayerPanel: React.FC = () => {
     requestRender();
   }, [activeLayer, setLayerOpacity]);
 
+  const handleOpacityCommit = useCallback(() => {
+    if (!activeLayer || opacityBeforeEdit.current === null) return;
+    const prev = opacityBeforeEdit.current;
+    const next = activeLayer.opacity;
+    if (prev !== next) {
+      commitLayerOpacity(activeLayer.id, prev, next);
+    }
+    opacityBeforeEdit.current = null;
+  }, [activeLayer, commitLayerOpacity]);
+
   return (
     <div className="layer-panel" data-testid="layer-panel">
       {/* Layer Controls */}
@@ -212,8 +224,14 @@ const LayerPanel: React.FC = () => {
               max={100}
               value={activeOpacity}
               data-testid="layer-opacity-input"
-              onFocus={() => setShowOpacitySlider(true)}
+              onFocus={() => {
+                setShowOpacitySlider(true);
+                if (activeLayer && opacityBeforeEdit.current === null) {
+                  opacityBeforeEdit.current = activeLayer.opacity;
+                }
+              }}
               onChange={(e) => handleOpacityChange(parseInt(e.target.value) || 0)}
+              onBlur={handleOpacityCommit}
             />
             <span className="layer-controls-unit">%</span>
             {showOpacitySlider && (
@@ -224,7 +242,13 @@ const LayerPanel: React.FC = () => {
                   max={100}
                   value={activeOpacity}
                   data-testid="layer-opacity-slider"
+                  onPointerDown={() => {
+                    if (activeLayer && opacityBeforeEdit.current === null) {
+                      opacityBeforeEdit.current = activeLayer.opacity;
+                    }
+                  }}
                   onChange={(e) => handleOpacityChange(parseInt(e.target.value))}
+                  onPointerUp={handleOpacityCommit}
                 />
               </div>
             )}
