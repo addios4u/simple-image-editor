@@ -48,15 +48,6 @@ const Toolbar: React.FC = () => {
   const zoomIn = () => setZoom(Math.min(zoom * 1.25, 32));
   const zoomOut = () => setZoom(Math.max(zoom / 1.25, 0.01));
 
-  const pickColor = useCallback(async () => {
-    if (!('EyeDropper' in window)) return;
-    const EyeDropper = (window as any).EyeDropper;
-    try {
-      const result = await new EyeDropper().open();
-      setFillColor(result.sRGBHex);
-    } catch { /* cancelled */ }
-  }, [setFillColor]);
-
   const handleExport = useCallback(() => {
     try {
       const bytes = compositeToBytes('png');
@@ -89,12 +80,18 @@ const Toolbar: React.FC = () => {
       </button>
       <div className="toolbar-separator" />
       <div className="color-picker-group">
-        <button
+        <label
           className="color-swatch-btn"
-          style={{ background: fillColor }}
-          onClick={pickColor}
-          title="Pick Color (Eyedropper)"
-        />
+          style={{ background: fillColor, position: 'relative', cursor: 'pointer' }}
+          title="Pick Color"
+        >
+          <input
+            type="color"
+            value={fillColor}
+            onChange={(e) => setFillColor(e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%', padding: 0, border: 'none' }}
+          />
+        </label>
         <div className="color-info">
           <span
             className={`color-hex${copied === fillColor ? ' copied' : ''}`}
