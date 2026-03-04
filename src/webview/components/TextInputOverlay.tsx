@@ -45,10 +45,12 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = 'auto';
-    const newHeight = Math.min(ta.scrollHeight, maxHeight);
-    ta.style.height = `${newHeight}px`;
-    ta.style.overflow = ta.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    // height: 1px으로 완전히 축소 후 scrollHeight 측정해야 정확한 콘텐츠 높이를 얻음
+    ta.style.height = '1px';
+    const scrollH = ta.scrollHeight;
+    const cappedH = Math.min(scrollH, maxHeight);
+    ta.style.height = `${cappedH}px`;
+    ta.style.overflowY = scrollH > maxHeight ? 'auto' : 'hidden';
   }, [text, maxHeight]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -97,14 +99,14 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
           outline: '1.5px dashed #0088ff',
           border: 'none',
           resize: 'none',
-          overflow: 'hidden',
+          overflowX: 'auto',
+          // overflowY는 effect에서 관리 (height 측정과 함께)
           // padding 제거 → canvas의 (x, y)와 텍스트 시작 위치 일치
           padding: 0,
           margin: 0,
           minWidth: `${Math.max(120, scaledFontSize * 4)}px`,
           maxWidth: `${maxWidth}px`,
           minHeight: `${scaledFontSize * 1.4}px`,
-          maxHeight: `${maxHeight}px`,
           boxSizing: 'content-box',
           whiteSpace: 'pre',
           display: 'block',
