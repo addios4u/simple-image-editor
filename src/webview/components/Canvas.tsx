@@ -562,6 +562,7 @@ const Canvas: React.FC = () => {
               const after = captureLayerRegion(layerId, sel.x, sel.y, sel.width, sel.height);
               if (after) commitSnapshot(entryId, after);
               useEditorStore.getState().setFillColor(result.color);
+              useLayerStore.getState().bumpThumbnailVersion();
               requestRender();
             } catch (e) { console.error('Fill error:', e); }
           }}
@@ -590,6 +591,7 @@ const Canvas: React.FC = () => {
               if (after) commitSnapshot(entryId, after);
               useEditorStore.getState().setStrokeColor(result.color);
               useEditorStore.getState().setStrokeWidth(result.width);
+              useLayerStore.getState().bumpThumbnailVersion();
               requestRender();
             } catch (e) { console.error('Stroke error:', e); }
           }}
@@ -659,6 +661,7 @@ const Canvas: React.FC = () => {
                 const ok = await pasteImageAsNewLayer(blobToPaste, newLayer.id);
                 if (ok) {
                   useLayerStore.getState().setActiveLayer(newLayer.id);
+                  useLayerStore.getState().bumpThumbnailVersion();
                   requestRender();
                 } else {
                   useLayerStore.getState().removeLayer(newLayer.id);
@@ -680,6 +683,7 @@ const Canvas: React.FC = () => {
                   activeLayerId, selection.x, selection.y, selection.width, selection.height,
                 );
                 if (after) commitSnapshot(entryId, after);
+                useLayerStore.getState().bumpThumbnailVersion();
                 requestRender();
                 break;
               }
@@ -719,6 +723,7 @@ const Canvas: React.FC = () => {
                   setCanvasSize(w, h);
                   setSelection(null);
                 }
+                useLayerStore.getState().bumpThumbnailVersion();
                 requestRender();
                 break;
               }

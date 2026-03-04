@@ -14,7 +14,9 @@ export interface Layer {
 interface LayerState {
   layers: Layer[];
   activeLayerId: string;
+  thumbnailVersion: number;
   // Actions
+  bumpThumbnailVersion: () => void;
   addLayer: () => void;
   removeLayer: (id: string) => void;
   setLayerVisibility: (id: string, visible: boolean) => void;
@@ -37,6 +39,9 @@ let nextId = 2;
 export const useLayerStore = create<LayerState>((set, get) => ({
   layers: [{ id: 'layer-1', name: 'Background', visible: true, opacity: 1, locked: false, blendMode: 'Normal', offsetX: 0, offsetY: 0 }],
   activeLayerId: 'layer-1',
+  thumbnailVersion: 0,
+
+  bumpThumbnailVersion: () => set((state) => ({ thumbnailVersion: state.thumbnailVersion + 1 })),
 
   addLayer: () =>
     set((state) => {

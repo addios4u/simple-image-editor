@@ -16,6 +16,7 @@ const THUMB_SIZE = 40;
 
 const LayerThumbnail: React.FC<{ layerId: string }> = ({ layerId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const thumbnailVersion = useLayerStore((s) => s.thumbnailVersion);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,7 +57,7 @@ const LayerThumbnail: React.FC<{ layerId: string }> = ({ layerId }) => {
 
     // Draw scaled layer on top
     ctx.drawImage(offscreen, 0, 0, THUMB_SIZE, THUMB_SIZE);
-  }, [layerId]);
+  }, [layerId, thumbnailVersion]);
 
   return (
     <canvas
