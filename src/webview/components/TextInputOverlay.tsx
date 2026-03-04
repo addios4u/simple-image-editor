@@ -23,6 +23,12 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
   const fontBold = useEditorStore((s) => s.fontBold);
   const fontItalic = useEditorStore((s) => s.fontItalic);
   const fillColor = useEditorStore((s) => s.fillColor);
+  const canvasWidth = useEditorStore((s) => s.canvasWidth);
+  const canvasHeight = useEditorStore((s) => s.canvasHeight);
+
+  // 삽입점부터 캔버스 끝까지 남은 공간 (화면 픽셀)
+  const maxWidth = Math.max(120, (canvasWidth - x) * zoom);
+  const maxHeight = Math.max(40, (canvasHeight - y) * zoom);
 
   // 마운트 시 포커스 — pointerdown 이벤트 처리가 끝난 후 포커스해야 브라우저가 가로채지 않음
   useEffect(() => {
@@ -35,13 +41,15 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
     return () => clearTimeout(id);
   }, []);
 
-  // 내용에 맞게 textarea 높이 자동 조절
+  // 내용에 맞게 textarea 높이 자동 조절 (캔버스 하단까지만)
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
-  }, [text]);
+    const newHeight = Math.min(ta.scrollHeight, maxHeight);
+    ta.style.height = `${newHeight}px`;
+    ta.style.overflow = ta.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [text, maxHeight]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Cmd+Enter / Ctrl+Enter → 확정
@@ -94,7 +102,9 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
           padding: 0,
           margin: 0,
           minWidth: `${Math.max(120, scaledFontSize * 4)}px`,
+          maxWidth: `${maxWidth}px`,
           minHeight: `${scaledFontSize * 1.4}px`,
+          maxHeight: `${maxHeight}px`,
           boxSizing: 'content-box',
           whiteSpace: 'pre',
           display: 'block',
