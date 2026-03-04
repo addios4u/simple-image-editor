@@ -76,4 +76,50 @@ describe('aiStore', () => {
     expect(state.isGenerating).toBe(true);
     expect(state.error).toBeNull();
   });
+
+  describe('generationContext', () => {
+    it('initial generationContext is null', () => {
+      expect(useAIStore.getState().generationContext).toBeNull();
+    });
+
+    it('setGenerationContext stores target size and selection info', () => {
+      const ctx = {
+        targetWidth: 512,
+        targetHeight: 384,
+        selectionX: 100,
+        selectionY: 50,
+        apiSize: '512x512',
+      };
+      useAIStore.getState().setGenerationContext(ctx);
+      expect(useAIStore.getState().generationContext).toEqual(ctx);
+    });
+
+    it('setGenerationContext with null clears context', () => {
+      useAIStore.getState().setGenerationContext({
+        targetWidth: 800,
+        targetHeight: 600,
+        selectionX: 0,
+        selectionY: 0,
+        apiSize: '1024x1024',
+      });
+      useAIStore.getState().setGenerationContext(null);
+      expect(useAIStore.getState().generationContext).toBeNull();
+    });
+
+    it('clearResult also clears generationContext', () => {
+      useAIStore.getState().setGenerationContext({
+        targetWidth: 800,
+        targetHeight: 600,
+        selectionX: 0,
+        selectionY: 0,
+        apiSize: '1024x1024',
+      });
+      useAIStore.getState().setResult('someData');
+      useAIStore.getState().clearResult();
+
+      const state = useAIStore.getState();
+      expect(state.result).toBeNull();
+      expect(state.generationContext).toBeNull();
+    });
+  });
 });
