@@ -163,9 +163,11 @@ interface FreeTransformState {
   originalPixels: Uint8Array;
   originalW: number;
   originalH: number;
-  originalX: number;
-  originalY: number;
-  currentBounds: { x: number; y: number; width: number; height: number };
+  originalX: number;  // layer-local
+  originalY: number;  // layer-local
+  layerOffsetX: number;  // layer offset at init time (for canvas↔layer-local conversion)
+  layerOffsetY: number;
+  currentBounds: { x: number; y: number; width: number; height: number };  // canvas coords
   activeHandle: HandleId | null;
   dragStartX: number;
   dragStartY: number;
@@ -356,16 +358,17 @@ const Canvas: React.FC = () => {
 
       if (e.key === 'Enter') {
         e.preventDefault();
-        const { currentBounds, originalPixels, originalW, originalH, layerId } = tf;
+        const { currentBounds, originalPixels, originalW, originalH, layerId, layerOffsetX, layerOffsetY } = tf;
         const resampled = resampleBuffer(
           originalPixels, originalW, originalH,
           currentBounds.width, currentBounds.height,
         );
         if (resampled) {
+          // currentBounds is canvas-space; convert to layer-local by subtracting layer offset
           stampBufferOntoLayer(
             layerId, resampled,
             currentBounds.width, currentBounds.height,
-            currentBounds.x, currentBounds.y,
+            currentBounds.x - layerOffsetX, currentBounds.y - layerOffsetY,
           );
         }
         clearFloatingLayer();
@@ -376,6 +379,7 @@ const Canvas: React.FC = () => {
       } else if (e.key === 'Escape') {
         e.preventDefault();
         const { originalPixels, originalW, originalH, layerId, originalX, originalY } = tf;
+        // originalX/Y are layer-local coords (set at init)
         stampBufferOntoLayer(layerId, originalPixels, originalW, originalH, originalX, originalY);
         clearFloatingLayer();
         setFreeTransformState(null);
@@ -774,29 +778,42 @@ const Canvas: React.FC = () => {
                 const bounds = mask.getBounds();
                 if (!bounds) break;
 
-                const extracted = extractMaskedPixels(activeLayerId, maskData);
+                const ftLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
+                const offX = ftLayer?.offsetX ?? 0;
+                const offY = ftLayer?.offsetY ?? 0;
+
+                // Mask is in canvas-space; convert to layer-local before extracting
+                const { canvasWidth: cw, canvasHeight: ch } = useEditorStore.getState();
+                const adjMask = adjustMaskForOffset(maskData, cw, ch, offX, offY);
+                const extracted = extractMaskedPixels(activeLayerId, adjMask);
                 if (!extracted) break;
 
-                const { x: bx, y: by, width: bw, height: bh } = bounds;
-                const imgW = useEditorStore.getState().canvasWidth;
+                const { x: bx, y: by, width: bw, height: bh } = bounds;  // canvas-space
+                const lbx = bx - offX;  // layer-local
+                const lby = by - offY;
                 const originalPixels = new Uint8Array(bw * bh * 4);
                 for (let row = 0; row < bh; row++) {
-                  const srcOff = ((by + row) * imgW + bx) * 4;
+                  const srcOff = ((lby + row) * cw + lbx) * 4;  // read at layer-local coords
                   const dstOff = row * bw * 4;
                   originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), dstOff);
                 }
 
                 setFloatingLayer(originalPixels, bw, bh);
-                setFloatingOffset(bx, by);
+                setFloatingOffset(bx, by);  // floating offset is canvas-space for rendering
                 requestRender();
+
+                // Hide marching ants
+                setSelection(null);
 
                 const transformState: FreeTransformState = {
                   layerId: activeLayerId,
                   originalPixels,
                   originalW: bw,
                   originalH: bh,
-                  originalX: bx,
-                  originalY: by,
+                  originalX: lbx,  // layer-local
+                  originalY: lby,
+                  layerOffsetX: offX,
+                  layerOffsetY: offY,
                   currentBounds: { x: bx, y: by, width: bw, height: bh },
                   activeHandle: null,
                   dragStartX: 0,

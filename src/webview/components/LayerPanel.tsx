@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
-import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, setLayerBlendMode as engineSetBlendMode, addLayer as engineAddLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
+import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, setLayerBlendMode as engineSetBlendMode, addLayer as engineAddLayer, removeLayer as engineRemoveLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
 
 const BLEND_MODES = [
   'Normal', 'Multiply', 'Screen', 'Overlay',
@@ -280,7 +280,9 @@ const LayerPanel: React.FC = () => {
                   data-testid={`delete-layer-${layer.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
+                    engineRemoveLayer(layer.id);
                     removeLayer(layer.id);
+                    requestRender();
                   }}
                   disabled={layers.length <= 1}
                   aria-label={`Delete ${layer.name}`}
