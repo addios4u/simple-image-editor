@@ -112,9 +112,12 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
             const oraResult = await this._requestOraData(document);
 
             if (oraResult.layerCount > 1) {
-                // Multiple layers: save ORA sidecar only, preserve original
+                // Multiple layers: save ORA sidecar + flattened original
                 const oraUri = vscode.Uri.file(document.uri.path + '.ora');
                 await vscode.workspace.fs.writeFile(oraUri, oraResult.data);
+                const format = this._getFormatFromUri(document.uri);
+                const data = await this._requestFileData(document, format);
+                await vscode.workspace.fs.writeFile(document.uri, data);
             } else {
                 // Single layer: save flattened to original, clean up stale sidecar
                 const format = this._getFormatFromUri(document.uri);
@@ -131,6 +134,12 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
         }
 
         document.clearEdits();
+
+        // Notify webview that save completed
+        const panel = this._documentPanelMap.get(document);
+        if (panel) {
+            panel.webview.postMessage({ type: 'saved' });
+        }
     }
 
     public async saveCustomDocumentAs(

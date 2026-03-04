@@ -69,6 +69,12 @@ body {
   text-overflow: ellipsis;
 }
 
+.dirty-indicator {
+  color: var(--vscode-editorWarning-foreground, #e2b340);
+  margin-right: 4px;
+  font-size: 10px;
+}
+
 .toolbar-btn {
   width: 36px;
   height: 36px;
@@ -1129,6 +1135,15 @@ canvas {
   background: var(--accent);
   color: #fff;
   border-radius: 3px;
+}
+
+.mode-seg-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mode-seg-btn:disabled:hover {
+  color: var(--text-secondary);
 }
 
 .color-picker-group {

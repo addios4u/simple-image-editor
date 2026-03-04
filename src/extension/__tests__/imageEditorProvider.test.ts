@@ -341,6 +341,7 @@ describe('ImageEditorProvider', () => {
 
             // ORA data response (fake ZIP bytes)
             const oraBytes = [0x50, 0x4B, 0x03, 0x04];
+            const flattenedBytes = [0xAA, 0xBB];
 
             mockPostMessage.mockImplementation((msg: any) => {
                 if (msg.type === 'getOraData') {
@@ -348,6 +349,13 @@ describe('ImageEditorProvider', () => {
                         getHandler()({
                             type: 'getOraDataResponse',
                             body: { requestId: msg.body.requestId, data: oraBytes, layerCount: 2 },
+                        });
+                    }, 0);
+                } else if (msg.type === 'getFileData') {
+                    setTimeout(() => {
+                        getHandler()({
+                            type: 'getFileDataResponse',
+                            body: { requestId: msg.body.requestId, data: flattenedBytes },
                         });
                     }, 0);
                 }
@@ -359,12 +367,15 @@ describe('ImageEditorProvider', () => {
                 mockDocument, { isCancellationRequested: false } as any
             );
 
-            // Original file should NOT be written when layerCount > 1
-            expect(mockWriteFile).toHaveBeenCalledTimes(1);
-            // Only ORA sidecar written
+            // Both ORA sidecar and flattened original should be written
+            expect(mockWriteFile).toHaveBeenCalledTimes(2);
             expect(mockWriteFile).toHaveBeenCalledWith(
                 expect.objectContaining({ path: '/test/image.png.ora' }),
                 new Uint8Array(oraBytes),
+            );
+            expect(mockWriteFile).toHaveBeenCalledWith(
+                mockUri,
+                new Uint8Array(flattenedBytes),
             );
         });
 

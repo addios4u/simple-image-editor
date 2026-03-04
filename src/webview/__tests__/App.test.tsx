@@ -35,6 +35,7 @@ vi.mock('../state/historyStore', () => ({
       undo: mockHistoryUndo,
       redo: mockHistoryRedo,
     }),
+    subscribe: vi.fn(() => vi.fn()),
   },
 }));
 

@@ -6,7 +6,8 @@ export type ExtToWebviewMessage =
   | { type: 'getOraData'; body: { requestId: string } }
   | { type: 'aiGenerateResult'; body: { imageData?: string; error?: string } }
   | { type: 'triggerUndo' }
-  | { type: 'triggerRedo' };
+  | { type: 'triggerRedo' }
+  | { type: 'saved' };
 
 // Webview -> Extension messages
 export type WebviewToExtMessage =

@@ -6,6 +6,7 @@ const ModeSegment: React.FC = () => {
   const mode = useEditorStore((s) => s.mode);
   const setMode = useEditorStore((s) => s.setMode);
   const fileName = useEditorStore((s) => s.fileName);
+  const isOra = useEditorStore((s) => s.isOra);
 
   const isSvg = fileName.toLowerCase().endsWith('.svg');
   if (isSvg) return null;
@@ -13,9 +14,10 @@ const ModeSegment: React.FC = () => {
   return (
     <div className="mode-segment">
       <button
-        className={`mode-seg-btn${mode === 'viewer' ? ' active' : ''}`}
-        onClick={() => setMode('viewer')}
-        title="Viewer"
+        className={`mode-seg-btn${mode === 'viewer' ? ' active' : ''}${isOra ? ' disabled' : ''}`}
+        onClick={() => !isOra && setMode('viewer')}
+        title={isOra ? 'Viewer not available for .ora files' : 'Viewer'}
+        disabled={isOra}
       >
         <Eye size={14} />
         <span>Viewer</span>

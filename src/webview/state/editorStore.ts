@@ -34,6 +34,8 @@ interface EditorState {
   fontBold: boolean;
   fontItalic: boolean;
   requestTextEditLayerId: string | null;
+  isDirty: boolean;
+  isOra: boolean;
   // Actions
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: ToolType) => void;
@@ -53,6 +55,8 @@ interface EditorState {
   setFontBold: (b: boolean) => void;
   setFontItalic: (i: boolean) => void;
   setRequestTextEditLayerId: (id: string | null) => void;
+  setDirty: (dirty: boolean) => void;
+  setIsOra: (isOra: boolean) => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -77,6 +81,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   fontBold: false,
   fontItalic: false,
   requestTextEditLayerId: null,
+  isDirty: false,
+  isOra: false,
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setZoom: (zoom) => set({ zoom }),
@@ -98,4 +104,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setFontBold: (fontBold) => set({ fontBold }),
   setFontItalic: (fontItalic) => set({ fontItalic }),
   setRequestTextEditLayerId: (requestTextEditLayerId) => set({ requestTextEditLayerId }),
+  setDirty: (isDirty) => set({ isDirty }),
+  setIsOra: (isOra) => set({ isOra }),
 }));

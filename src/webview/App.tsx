@@ -36,6 +36,26 @@ const App: React.FC = () => {
 
     useKeyboardShortcuts();
 
+    // Subscribe to historyStore to track dirty state and notify extension
+    useEffect(() => {
+        const unsubscribe = useHistoryStore.subscribe((state, prevState) => {
+            if (state.undoStack.length > prevState.undoStack.length) {
+                useEditorStore.getState().setDirty(true);
+                const latest = state.undoStack[state.undoStack.length - 1];
+                vscodeApi.postMessage({
+                    type: 'edit',
+                    body: {
+                        id: latest.id,
+                        kind: latest.label,
+                        data: {},
+                        timestamp: latest.timestamp,
+                    },
+                });
+            }
+        });
+        return unsubscribe;
+    }, []);
+
     useEffect(() => {
         const handler = async (event: MessageEvent) => {
             const message = event.data;
@@ -77,6 +97,7 @@ const App: React.FC = () => {
                         // .ora files enter editor mode automatically
                         if (isOra) {
                             useEditorStore.getState().setMode('editor');
+                            useEditorStore.getState().setIsOra(true);
                         }
                     } catch (err) {
                         console.error('Failed to initialize WASM engine:', err);
@@ -118,6 +139,10 @@ const App: React.FC = () => {
                 } else if (imageData) {
                     aiStore.setResult(imageData);
                 }
+            }
+
+            if (message?.type === 'saved') {
+                useEditorStore.getState().setDirty(false);
             }
 
             if (message?.type === 'getOraData') {

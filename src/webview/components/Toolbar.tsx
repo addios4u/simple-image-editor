@@ -36,6 +36,7 @@ const Toolbar: React.FC = () => {
   const fileName = useEditorStore((s) => s.fileName);
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
+  const isDirty = useEditorStore((s) => s.isDirty);
   const selectionShape = useEditorStore((s) => s.selectionShape);
   const toggleSelectionShape = useEditorStore((s) => s.toggleSelectionShape);
 
@@ -165,6 +166,7 @@ const Toolbar: React.FC = () => {
       </button>
       <div className="toolbar-separator" />
       <span className="toolbar-file-label">
+        {isDirty && <span className="dirty-indicator" title="Unsaved changes">●</span>}
         {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
       </span>
       <div className="toolbar-spacer" />

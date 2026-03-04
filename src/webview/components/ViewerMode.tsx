@@ -38,6 +38,7 @@ const ViewerMode: React.FC = () => {
   const fileName = useEditorStore((s) => s.fileName);
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
+  const isDirty = useEditorStore((s) => s.isDirty);
   const fillColor = useEditorStore((s) => s.fillColor);
   const setFillColor = useEditorStore((s) => s.setFillColor);
   const setCanvasSize = useEditorStore((s) => s.setCanvasSize);
@@ -168,6 +169,7 @@ const ViewerMode: React.FC = () => {
         </div>
         <div className="toolbar-separator" />
         <span className="toolbar-file-label">
+          {isDirty && <span className="dirty-indicator" title="Unsaved changes">●</span>}
           {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
         </span>
         <div className="toolbar-spacer" />
