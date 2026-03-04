@@ -172,6 +172,10 @@ pub fn gaussian_blur(buffer: &mut PixelBuffer, sigma: f32) {
 
 /// Apply a Gaussian blur only within a rectangular region of the buffer (in-place).
 /// Pixels outside the region are unchanged.
+///
+/// To avoid edge-clamping artifacts (inner shadow) at the region boundary, the
+/// blur is applied to an extended area that includes `kernel_radius` extra pixels
+/// on each side. Only the pixels within the original region are written back.
 pub fn gaussian_blur_region(buffer: &mut PixelBuffer, sigma: f32, rx: u32, ry: u32, rw: u32, rh: u32) {
     if sigma <= 0.0 || rw == 0 || rh == 0 { return; }
     let bw = buffer.width();
@@ -180,17 +184,33 @@ pub fn gaussian_blur_region(buffer: &mut PixelBuffer, sigma: f32, rx: u32, ry: u
     let rw = rw.min(bw - rx);
     let rh = rh.min(bh - ry);
 
-    let mut region = buffer.clone_region(rx, ry, rw, rh);
-    gaussian_blur(&mut region, sigma);
+    // Extend sampling area by the kernel radius to avoid edge-clamp artifacts.
+    let pad = (3.0 * sigma).ceil() as u32;
+    let ext_x = rx.saturating_sub(pad);
+    let ext_y = ry.saturating_sub(pad);
+    let ext_x2 = (rx + rw + pad).min(bw);
+    let ext_y2 = (ry + rh + pad).min(bh);
+    let ext_w = ext_x2 - ext_x;
+    let ext_h = ext_y2 - ext_y;
+
+    let mut extended = buffer.clone_region(ext_x, ext_y, ext_w, ext_h);
+    gaussian_blur(&mut extended, sigma);
+
+    // Write back only the pixels within the original selection.
+    let off_x = rx - ext_x;
+    let off_y = ry - ext_y;
     for y in 0..rh {
         for x in 0..rw {
-            buffer.set_pixel(rx + x, ry + y, region.get_pixel(x, y));
+            buffer.set_pixel(rx + x, ry + y, extended.get_pixel(off_x + x, off_y + y));
         }
     }
 }
 
 /// Apply a motion blur only within a rectangular region of the buffer (in-place).
 /// Pixels outside the region are unchanged.
+///
+/// The sampling area is extended by `distance` pixels to avoid edge-clamping
+/// artifacts at the region boundary.
 pub fn motion_blur_region(buffer: &mut PixelBuffer, angle: f32, distance: u32, rx: u32, ry: u32, rw: u32, rh: u32) {
     if distance == 0 || rw == 0 || rh == 0 { return; }
     let bw = buffer.width();
@@ -199,11 +219,24 @@ pub fn motion_blur_region(buffer: &mut PixelBuffer, angle: f32, distance: u32, r
     let rw = rw.min(bw - rx);
     let rh = rh.min(bh - ry);
 
-    let mut region = buffer.clone_region(rx, ry, rw, rh);
-    motion_blur(&mut region, angle, distance);
+    // Extend sampling area by the motion distance to avoid edge-clamp artifacts.
+    let pad = distance;
+    let ext_x = rx.saturating_sub(pad);
+    let ext_y = ry.saturating_sub(pad);
+    let ext_x2 = (rx + rw + pad).min(bw);
+    let ext_y2 = (ry + rh + pad).min(bh);
+    let ext_w = ext_x2 - ext_x;
+    let ext_h = ext_y2 - ext_y;
+
+    let mut extended = buffer.clone_region(ext_x, ext_y, ext_w, ext_h);
+    motion_blur(&mut extended, angle, distance);
+
+    // Write back only the pixels within the original selection.
+    let off_x = rx - ext_x;
+    let off_y = ry - ext_y;
     for y in 0..rh {
         for x in 0..rw {
-            buffer.set_pixel(rx + x, ry + y, region.get_pixel(x, y));
+            buffer.set_pixel(rx + x, ry + y, extended.get_pixel(off_x + x, off_y + y));
         }
     }
 }
