@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import Minimap from './Minimap';
+import ContextMenu, { type ContextMenuAction } from './ContextMenu';
 import { BaseTool, type PointerEvent as ToolPointerEvent } from '../tools/BaseTool';
 import { MoveTool, type MoveToolConfig } from '../tools/MoveTool';
 import { MarqueeTool, type MarqueeToolConfig } from '../tools/MarqueeTool';
@@ -121,11 +122,14 @@ const Canvas: React.FC = () => {
   const zoom = useEditorStore((s) => s.zoom);
   const activeTool = useEditorStore((s) => s.activeTool);
 
+  const selection = useEditorStore((s) => s.selection);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const antsOffsetRef = useRef(0);
   const antsRafRef = useRef<number>(0);
 
@@ -245,6 +249,11 @@ const Canvas: React.FC = () => {
     [tool, zoom],
   );
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
   return (
     <div className="canvas-area-wrapper">
       <div
@@ -274,6 +283,7 @@ const Canvas: React.FC = () => {
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
+              onContextMenu={handleContextMenu}
             />
             <canvas
               ref={overlayRef}
@@ -300,6 +310,19 @@ const Canvas: React.FC = () => {
         cursorX={cursorPos.x}
         cursorY={cursorPos.y}
       />
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={!!selection}
+          onClose={() => setContextMenu(null)}
+          onAction={(action: ContextMenuAction) => {
+            setContextMenu(null);
+            // TODO: 각 action 처리 (Phase 2에서 연동)
+            console.log('Context menu action:', action);
+          }}
+        />
+      )}
     </div>
   );
 };
