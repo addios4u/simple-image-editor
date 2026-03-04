@@ -62,6 +62,7 @@ describe('TextTool', () => {
       config = {
         getActiveLayerId: vi.fn(() => 'layer-1'),
         getLayerTextData: vi.fn(() => undefined),
+        getLayerOffset: vi.fn(() => ({ x: 0, y: 0 })),
         openTextEditor: vi.fn(),
       };
       tool = new TextTool(config);
@@ -83,10 +84,30 @@ describe('TextTool', () => {
         y: 80,
       };
       (config.getLayerTextData as ReturnType<typeof vi.fn>).mockReturnValue(existing);
+      (config.getLayerOffset as ReturnType<typeof vi.fn>).mockReturnValue({ x: 0, y: 0 });
 
       tool.onPointerDown(makeEvent(120, 130));
 
       expect(config.openTextEditor).toHaveBeenCalledWith(50, 80, 'layer-1', existing);
+    });
+
+    it('accounts for layer offset when opening editor for existing text', () => {
+      const existing = {
+        text: 'Moved',
+        fontFamily: 'sans-serif',
+        fontSize: 24,
+        bold: false,
+        italic: false,
+        x: 50,
+        y: 80,
+      };
+      (config.getLayerTextData as ReturnType<typeof vi.fn>).mockReturnValue(existing);
+      (config.getLayerOffset as ReturnType<typeof vi.fn>).mockReturnValue({ x: 100, y: 30 });
+
+      tool.onPointerDown(makeEvent(0, 0));
+
+      // 오버레이는 textData 좌표 + layer offset = (150, 110)에 열려야 함
+      expect(config.openTextEditor).toHaveBeenCalledWith(150, 110, 'layer-1', existing);
     });
 
     it('does not call openTextEditor when config is not set', () => {

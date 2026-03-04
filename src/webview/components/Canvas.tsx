@@ -18,7 +18,7 @@ import {
   clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
   cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
   addLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
-  renderTextToLayer,
+  renderTextToLayer, bakeLayerOffset,
 } from '../engine/engineContext';
 import TextInputOverlay from './TextInputOverlay';
 import type { TextData } from '../state/layerStore';
@@ -86,6 +86,10 @@ let _openTextEditor: ((x: number, y: number, layerId: string | null, existing?: 
 const textConfig: TextToolConfig = {
   getActiveLayerId: () => useLayerStore.getState().activeLayerId,
   getLayerTextData: (id) => useLayerStore.getState().layers.find((l) => l.id === id)?.textData,
+  getLayerOffset: (id) => {
+    const layer = useLayerStore.getState().layers.find((l) => l.id === id);
+    return { x: layer?.offsetX ?? 0, y: layer?.offsetY ?? 0 };
+  },
   openTextEditor: (x, y, layerId, existing) => _openTextEditor?.(x, y, layerId, existing),
 };
 
@@ -250,8 +254,8 @@ const Canvas: React.FC = () => {
     const layer = useLayerStore.getState().layers.find((l) => l.id === requestTextEditLayerId);
     if (layer?.textData) {
       setTextOverlayState({
-        x: layer.textData.x,
-        y: layer.textData.y,
+        x: layer.textData.x + (layer.offsetX ?? 0),
+        y: layer.textData.y + (layer.offsetY ?? 0),
         layerId: layer.id,
         existing: layer.textData,
       });
