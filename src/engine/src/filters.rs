@@ -170,6 +170,44 @@ pub fn gaussian_blur(buffer: &mut PixelBuffer, sigma: f32) {
     }
 }
 
+/// Apply a Gaussian blur only within a rectangular region of the buffer (in-place).
+/// Pixels outside the region are unchanged.
+pub fn gaussian_blur_region(buffer: &mut PixelBuffer, sigma: f32, rx: u32, ry: u32, rw: u32, rh: u32) {
+    if sigma <= 0.0 || rw == 0 || rh == 0 { return; }
+    let bw = buffer.width();
+    let bh = buffer.height();
+    if rx >= bw || ry >= bh { return; }
+    let rw = rw.min(bw - rx);
+    let rh = rh.min(bh - ry);
+
+    let mut region = buffer.clone_region(rx, ry, rw, rh);
+    gaussian_blur(&mut region, sigma);
+    for y in 0..rh {
+        for x in 0..rw {
+            buffer.set_pixel(rx + x, ry + y, region.get_pixel(x, y));
+        }
+    }
+}
+
+/// Apply a motion blur only within a rectangular region of the buffer (in-place).
+/// Pixels outside the region are unchanged.
+pub fn motion_blur_region(buffer: &mut PixelBuffer, angle: f32, distance: u32, rx: u32, ry: u32, rw: u32, rh: u32) {
+    if distance == 0 || rw == 0 || rh == 0 { return; }
+    let bw = buffer.width();
+    let bh = buffer.height();
+    if rx >= bw || ry >= bh { return; }
+    let rw = rw.min(bw - rx);
+    let rh = rh.min(bh - ry);
+
+    let mut region = buffer.clone_region(rx, ry, rw, rh);
+    motion_blur(&mut region, angle, distance);
+    for y in 0..rh {
+        for x in 0..rw {
+            buffer.set_pixel(rx + x, ry + y, region.get_pixel(x, y));
+        }
+    }
+}
+
 /// Apply a motion blur at the given angle (degrees) and distance to the buffer (in-place).
 /// Samples pixels along the direction vector defined by the angle.
 /// Alpha channel is preserved unchanged.

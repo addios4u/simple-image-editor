@@ -309,6 +309,20 @@ impl LayerCompositor {
         }
     }
 
+    /// Apply gaussian blur to a rectangular region of a specific layer.
+    pub fn gaussian_blur_layer_region(&mut self, index: usize, sigma: f32, x: u32, y: u32, w: u32, h: u32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::filters::gaussian_blur_region(&mut layer.buffer, sigma, x, y, w, h);
+        }
+    }
+
+    /// Apply motion blur to a rectangular region of a specific layer.
+    pub fn motion_blur_layer_region(&mut self, index: usize, angle: f32, distance: u32, x: u32, y: u32, w: u32, h: u32) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            crate::filters::motion_blur_region(&mut layer.buffer, angle, distance, x, y, w, h);
+        }
+    }
+
     /// Capture a rectangular region snapshot from a layer for undo/redo.
     /// Returns a snapshot of a 0x0 region if the index is invalid.
     pub fn capture_layer_region(
