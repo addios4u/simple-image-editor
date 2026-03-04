@@ -547,3 +547,199 @@ impl LayerCompositor {
         self.layers.get_mut(index).map(|l| &mut l.buffer)
     }
 }
+
+#[wasm_bindgen]
+impl LayerCompositor {
+    /// Clear pixels in the masked area to transparent (RGBA 0,0,0,0).
+    /// mask must be exactly width*height bytes; mask[i] != 0 means clear that pixel.
+    pub fn clear_masked_pixels(&mut self, layer_idx: usize, mask: &[u8]) {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        if mask.len() != w * h {
+            return;
+        }
+        if let Some(layer) = self.layers.get_mut(layer_idx) {
+            let data = layer.buffer.raw_data_mut();
+            for i in 0..(w * h) {
+                if mask[i] != 0 {
+                    let px = i * 4;
+                    data[px]     = 0;
+                    data[px + 1] = 0;
+                    data[px + 2] = 0;
+                    data[px + 3] = 0;
+                }
+            }
+        }
+    }
+
+    /// Fill pixels in the masked area with the given RGBA color.
+    /// mask must be exactly width*height bytes; mask[i] != 0 means fill that pixel.
+    pub fn fill_masked_pixels(
+        &mut self,
+        layer_idx: usize,
+        mask: &[u8],
+        r: u8,
+        g: u8,
+        b: u8,
+        a: u8,
+    ) {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        if mask.len() != w * h {
+            return;
+        }
+        if let Some(layer) = self.layers.get_mut(layer_idx) {
+            let data = layer.buffer.raw_data_mut();
+            for i in 0..(w * h) {
+                if mask[i] != 0 {
+                    let px = i * 4;
+                    data[px]     = r;
+                    data[px + 1] = g;
+                    data[px + 2] = b;
+                    data[px + 3] = a;
+                }
+            }
+        }
+    }
+
+    /// Draw an inner stroke along the boundary of the masked selection.
+    /// "Boundary pixels" are masked pixels that have at least one non-masked
+    /// (or out-of-bounds) neighbour in the 4 cardinal directions.
+    /// All masked pixels within `width` pixels of a boundary pixel receive the stroke color.
+    pub fn stroke_masked_boundary(
+        &mut self,
+        layer_idx: usize,
+        mask: &[u8],
+        r: u8,
+        g: u8,
+        b: u8,
+        a: u8,
+        width: u32,
+    ) {
+        let cw = self.width as usize;
+        let ch = self.height as usize;
+        if mask.len() != cw * ch {
+            return;
+        }
+        if self.layers.get(layer_idx).is_none() {
+            return;
+        }
+
+        // Step 1: find boundary pixels (masked pixels adjacent to non-masked or edge).
+        let mut is_boundary = vec![false; cw * ch];
+        for y in 0..ch {
+            for x in 0..cw {
+                let i = y * cw + x;
+                if mask[i] == 0 {
+                    continue;
+                }
+                let boundary = (x == 0)
+                    || (x + 1 == cw)
+                    || (y == 0)
+                    || (y + 1 == ch)
+                    || mask[y * cw + (x - 1)] == 0
+                    || mask[y * cw + (x + 1)] == 0
+                    || mask[(y - 1) * cw + x] == 0
+                    || mask[(y + 1) * cw + x] == 0;
+                if boundary {
+                    is_boundary[i] = true;
+                }
+            }
+        }
+
+        // Step 2: BFS from boundary pixels, staying within mask, up to `width` steps.
+        // Mark pixels to stroke.
+        let mut stroke_mask = vec![false; cw * ch];
+        let mut queue: std::collections::VecDeque<(usize, usize, u32)> = std::collections::VecDeque::new();
+
+        for i in 0..(cw * ch) {
+            if is_boundary[i] {
+                stroke_mask[i] = true;
+                queue.push_back((i % cw, i / cw, 0));
+            }
+        }
+
+        while let Some((x, y, dist)) = queue.pop_front() {
+            if dist + 1 >= width {
+                continue;
+            }
+            let neighbors: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+            for (dx, dy) in neighbors {
+                let nx = x as isize + dx;
+                let ny = y as isize + dy;
+                if nx < 0 || ny < 0 || nx >= cw as isize || ny >= ch as isize {
+                    continue;
+                }
+                let ni = ny as usize * cw + nx as usize;
+                if mask[ni] != 0 && !stroke_mask[ni] {
+                    stroke_mask[ni] = true;
+                    queue.push_back((nx as usize, ny as usize, dist + 1));
+                }
+            }
+        }
+
+        // Step 3: apply stroke color to all marked pixels.
+        if let Some(layer) = self.layers.get_mut(layer_idx) {
+            let data = layer.buffer.raw_data_mut();
+            for i in 0..(cw * ch) {
+                if stroke_mask[i] {
+                    let px = i * 4;
+                    data[px]     = r;
+                    data[px + 1] = g;
+                    data[px + 2] = b;
+                    data[px + 3] = a;
+                }
+            }
+        }
+    }
+
+    /// Crop the canvas to the rectangle (x, y, w, h).
+    /// All layers are re-created with the new dimensions.
+    /// Each layer's offset is taken into account when copying pixels.
+    pub fn crop_canvas(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        if w == 0 || h == 0 {
+            return;
+        }
+
+        for layer in &mut self.layers {
+            let mut new_buf = PixelBuffer::new(w, h);
+            {
+                let dst = new_buf.raw_data_mut();
+                let src = layer.buffer.raw_data();
+                let old_w = self.width as i32;
+                let old_h = self.height as i32;
+                let off_x = layer.offset_x;
+                let off_y = layer.offset_y;
+
+                for ny in 0..h {
+                    for nx in 0..w {
+                        // Position in old canvas coordinates
+                        let old_canvas_x = x as i32 + nx as i32;
+                        let old_canvas_y = y as i32 + ny as i32;
+                        // Position in layer-local coordinates
+                        let lx = old_canvas_x - off_x;
+                        let ly = old_canvas_y - off_y;
+
+                        if lx < 0 || ly < 0 || lx >= old_w || ly >= old_h {
+                            continue;
+                        }
+
+                        let si = (ly as usize * self.width as usize + lx as usize) * 4;
+                        let di = (ny as usize * w as usize + nx as usize) * 4;
+                        dst[di]     = src[si];
+                        dst[di + 1] = src[si + 1];
+                        dst[di + 2] = src[si + 2];
+                        dst[di + 3] = src[si + 3];
+                    }
+                }
+            }
+            layer.buffer = new_buf;
+            // Reset offset since the canvas origin has shifted
+            layer.offset_x = 0;
+            layer.offset_y = 0;
+        }
+
+        self.width = w;
+        self.height = h;
+    }
+}
