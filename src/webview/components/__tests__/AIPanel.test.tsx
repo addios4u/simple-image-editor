@@ -67,6 +67,19 @@ describe('AIPanel', () => {
     expect(btn).toBeDisabled();
   });
 
+  it('shows spinner progress indicator when isGenerating', () => {
+    useAIStore.setState({ isGenerating: true });
+    render(<AIPanel />);
+    expect(screen.getByTestId('ai-progress')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-progress')).toHaveTextContent('Generating image...');
+  });
+
+  it('hides spinner when not generating', () => {
+    useAIStore.setState({ isGenerating: false });
+    render(<AIPanel />);
+    expect(screen.queryByTestId('ai-progress')).not.toBeInTheDocument();
+  });
+
   it('Generate button disabled when prompt is empty', () => {
     useAIStore.setState({ prompt: '' });
     render(<AIPanel />);

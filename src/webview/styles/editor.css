@@ -781,6 +781,33 @@ canvas {
   background: var(--border-color);
 }
 
+.ai-size-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ai-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.ai-spinner {
+  animation: ai-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ai-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .ai-error {
   background: rgba(255, 80, 80, 0.15);
   border: 1px solid rgba(255, 80, 80, 0.4);

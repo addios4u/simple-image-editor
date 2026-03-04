@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Sparkles, Settings } from 'lucide-react';
+import { Sparkles, Settings, Loader } from 'lucide-react';
 import { useAIStore, AIProvider } from '../state/aiStore';
 import { useEditorStore } from '../state/editorStore';
 import { getBestApiSize } from '../utils/aiSizeUtils';
@@ -142,6 +142,13 @@ const AIPanel: React.FC = () => {
             <Settings size={16} />
           </button>
         </div>
+
+        {isGenerating && (
+          <div className="ai-progress" data-testid="ai-progress">
+            <Loader size={16} className="ai-spinner" />
+            <span>Generating image...</span>
+          </div>
+        )}
 
         {error && (
           <div className="ai-error" data-testid="ai-error">
