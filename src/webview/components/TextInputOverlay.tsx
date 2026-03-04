@@ -24,12 +24,15 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
   const fontItalic = useEditorStore((s) => s.fontItalic);
   const fillColor = useEditorStore((s) => s.fillColor);
 
-  // 마운트 시 포커스
+  // 마운트 시 포커스 — pointerdown 이벤트 처리가 끝난 후 포커스해야 브라우저가 가로채지 않음
   useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.focus();
-    ta.select();
+    const id = setTimeout(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.select();
+    }, 0);
+    return () => clearTimeout(id);
   }, []);
 
   // 내용에 맞게 textarea 높이 자동 조절
