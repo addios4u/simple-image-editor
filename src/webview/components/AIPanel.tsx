@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Sparkles, Settings, Layers } from 'lucide-react';
+import { Sparkles, Settings } from 'lucide-react';
 import { useAIStore, AIProvider } from '../state/aiStore';
+import { useEditorStore } from '../state/editorStore';
+import { getBestApiSize } from '../utils/aiSizeUtils';
 import vscodeApi from '../vscode';
 import AISettingsDialog from './AISettingsDialog';
 
@@ -9,38 +11,47 @@ const AIPanel: React.FC = () => {
   const prompt = useAIStore((s) => s.prompt);
   const isGenerating = useAIStore((s) => s.isGenerating);
   const error = useAIStore((s) => s.error);
-  const result = useAIStore((s) => s.result);
   const setProvider = useAIStore((s) => s.setProvider);
   const setPrompt = useAIStore((s) => s.setPrompt);
   const startGeneration = useAIStore((s) => s.startGeneration);
+  const setGenerationContext = useAIStore((s) => s.setGenerationContext);
+
+  const selection = useEditorStore((s) => s.selection);
+  const canvasWidth = useEditorStore((s) => s.canvasWidth);
+  const canvasHeight = useEditorStore((s) => s.canvasHeight);
 
   const [showSettings, setShowSettings] = useState(false);
 
+  // Determine target size from selection or canvas
+  const targetWidth = selection ? selection.width : canvasWidth;
+  const targetHeight = selection ? selection.height : canvasHeight;
+  const sizeSource = selection ? 'selection' : 'canvas';
+
   const handleGenerate = useCallback(() => {
+    const tw = selection ? selection.width : canvasWidth;
+    const th = selection ? selection.height : canvasHeight;
+    const sx = selection ? selection.x : 0;
+    const sy = selection ? selection.y : 0;
+    const apiSize = getBestApiSize(tw, th, provider);
+
+    setGenerationContext({
+      targetWidth: tw,
+      targetHeight: th,
+      selectionX: sx,
+      selectionY: sy,
+      apiSize,
+    });
+
     startGeneration();
     vscodeApi.postMessage({
       type: 'aiGenerate',
       body: {
         prompt,
         provider,
-        size: '1024x1024',
+        size: apiSize,
       },
     });
-  }, [prompt, provider, startGeneration]);
-
-  const handleApplyToCanvas = useCallback(() => {
-    if (result) {
-      vscodeApi.postMessage({
-        type: 'edit',
-        body: {
-          id: `ai-${Date.now()}`,
-          kind: 'addLayer',
-          data: { imageData: result },
-          timestamp: Date.now(),
-        },
-      });
-    }
-  }, [result]);
+  }, [prompt, provider, startGeneration, setGenerationContext, selection, canvasWidth, canvasHeight]);
 
   const handleProviderChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -107,6 +118,10 @@ const AIPanel: React.FC = () => {
           />
         </div>
 
+        <div className="ai-size-info" data-testid="ai-size-info">
+          Size: {targetWidth} × {targetHeight} ({sizeSource})
+        </div>
+
         <div className="ai-btn-row">
           <button
             className="ai-generate-btn"
@@ -131,22 +146,6 @@ const AIPanel: React.FC = () => {
         {error && (
           <div className="ai-error" data-testid="ai-error">
             {error}
-          </div>
-        )}
-
-        {result && (
-          <div className="ai-result">
-            <span className="ai-field-label">Result</span>
-            <img
-              data-testid="ai-result-preview"
-              src={`data:image/png;base64,${result}`}
-              alt="AI generated preview"
-              className="ai-preview-image"
-            />
-            <button className="ai-apply-btn" onClick={handleApplyToCanvas}>
-              <Layers size={14} />
-              Apply to Canvas
-            </button>
           </div>
         )}
       </div>
