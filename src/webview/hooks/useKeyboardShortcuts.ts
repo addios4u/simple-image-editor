@@ -126,13 +126,13 @@ export function useKeyboardShortcuts(): void {
               useLayerStore.getState().setActiveLayer(newLayer.id);
               useLayerStore.getState().bumpThumbnailVersion();
               requestRender();
-              const pastedLayerId = newLayer.id;
+              let currentLayerId = newLayer.id;
               const savedBlob = blobToPaste;
               useHistoryStore.getState().pushEditWithAction(
                 'Paste',
                 () => {
-                  engineRemoveLayer(pastedLayerId);
-                  useLayerStore.getState().removeLayer(pastedLayerId);
+                  engineRemoveLayer(currentLayerId);
+                  useLayerStore.getState().removeLayer(currentLayerId);
                   requestRender();
                 },
                 () => {
@@ -143,6 +143,7 @@ export function useKeyboardShortcuts(): void {
                     if (!redoLayer) return;
                     const redoOk = await pasteImageAsNewLayer(savedBlob, redoLayer.id);
                     if (redoOk) {
+                      currentLayerId = redoLayer.id;
                       useLayerStore.getState().setActiveLayer(redoLayer.id);
                       useLayerStore.getState().bumpThumbnailVersion();
                       requestRender();

@@ -1046,13 +1046,13 @@ const Canvas: React.FC = () => {
                   useLayerStore.getState().setActiveLayer(newLayer.id);
                   useLayerStore.getState().bumpThumbnailVersion();
                   requestRender();
-                  const pastedLayerId = newLayer.id;
+                  let currentLayerId = newLayer.id;
                   const savedBlob = blobToPaste;
                   useHistoryStore.getState().pushEditWithAction(
                     'Paste',
                     () => {
-                      engineRemoveLayer(pastedLayerId);
-                      useLayerStore.getState().removeLayer(pastedLayerId);
+                      engineRemoveLayer(currentLayerId);
+                      useLayerStore.getState().removeLayer(currentLayerId);
                       requestRender();
                     },
                     () => {
@@ -1063,6 +1063,7 @@ const Canvas: React.FC = () => {
                         if (!redoLayer) return;
                         const redoOk = await pasteImageAsNewLayer(savedBlob, redoLayer.id);
                         if (redoOk) {
+                          currentLayerId = redoLayer.id;
                           useLayerStore.getState().setActiveLayer(redoLayer.id);
                           useLayerStore.getState().bumpThumbnailVersion();
                           requestRender();
