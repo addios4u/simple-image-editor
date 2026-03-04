@@ -17,16 +17,26 @@ vi.mock('../../state/historyStore', () => ({
 
 const mockFillRectLayer = vi.fn();
 const mockRequestRender = vi.fn();
-const mockCopySelection = vi.fn();
 const mockCutSelection = vi.fn();
-const mockPasteClipboard = vi.fn();
+const mockCopySelectionToBlob = vi.fn().mockResolvedValue(new Blob());
+const mockPasteImageAsNewLayer = vi.fn().mockResolvedValue(true);
+const mockSetInternalClipboard = vi.fn();
+const mockGetInternalClipboard = vi.fn().mockReturnValue(null);
 
 vi.mock('../../engine/engineContext', () => ({
   fillRectLayer: (...args: unknown[]) => mockFillRectLayer(...args),
   requestRender: (...args: unknown[]) => mockRequestRender(...args),
-  copySelection: (...args: unknown[]) => mockCopySelection(...args),
   cutSelection: (...args: unknown[]) => mockCutSelection(...args),
-  pasteClipboard: (...args: unknown[]) => mockPasteClipboard(...args),
+  copySelectionToBlob: (...args: unknown[]) => mockCopySelectionToBlob(...args),
+  pasteImageAsNewLayer: (...args: unknown[]) => mockPasteImageAsNewLayer(...args),
+  setInternalClipboard: (...args: unknown[]) => mockSetInternalClipboard(...args),
+  getInternalClipboard: () => mockGetInternalClipboard(),
+  clearMaskedPixels: vi.fn(),
+}));
+
+const mockGetSelectionMask = vi.fn();
+vi.mock('../../engine/selectionMask', () => ({
+  getSelectionMask: () => mockGetSelectionMask(),
 }));
 
 vi.mock('../../engine/helpers', () => ({
@@ -40,7 +50,9 @@ vi.mock('../../state/layerStore', () => ({
 }));
 
 function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
-  window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...opts }));
+  // code가 지정되지 않으면 key에서 자동 유추 (단일 문자 → 'KeyX' 형식)
+  const code = opts.code ?? (key.length === 1 ? `Key${key.toUpperCase()}` : key);
+  window.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true, ...opts }));
 }
 
 describe('useKeyboardShortcuts', () => {
@@ -50,6 +62,7 @@ describe('useKeyboardShortcuts', () => {
       activeTool: 'select',
       zoom: 1,
     });
+    mockGetSelectionMask.mockReturnValue({ isEmpty: () => true, getBounds: () => null });
   });
 
   afterEach(() => {
@@ -98,17 +111,17 @@ describe('useKeyboardShortcuts', () => {
       expect(useEditorStore.getState().activeTool).toBe('move');
     });
 
-    it('S key switches to select tool', () => {
+    it('M key switches to select tool', () => {
       useEditorStore.setState({ activeTool: 'brush' });
       renderHook(() => useKeyboardShortcuts());
-      fireKey('s');
+      fireKey('m');
       expect(useEditorStore.getState().activeTool).toBe('select');
     });
 
-    it('S key toggles selectionShape when already on select', () => {
+    it('M key toggles selectionShape when already on select', () => {
       useEditorStore.setState({ activeTool: 'select', selectionShape: 'rectangle' });
       renderHook(() => useKeyboardShortcuts());
-      fireKey('s');
+      fireKey('m');
       expect(useEditorStore.getState().selectionShape).toBe('ellipse');
       expect(useEditorStore.getState().activeTool).toBe('select');
     });
@@ -175,14 +188,19 @@ describe('useKeyboardShortcuts', () => {
       useEditorStore.setState({
         selection: { x: 10, y: 20, width: 100, height: 50 },
       });
+      // 선택 영역이 있는 마스크를 반환하도록 설정
+      mockGetSelectionMask.mockReturnValue({
+        isEmpty: () => false,
+        getBounds: () => ({ x: 10, y: 20, width: 100, height: 50 }),
+      });
     });
 
-    it('Cmd+C calls copySelection with active layer and selection', () => {
+    it('Cmd+C calls copySelectionToBlob with selection bounds', () => {
       renderHook(() => useKeyboardShortcuts());
       fireKey('c', { metaKey: true });
 
-      expect(mockCopySelection).toHaveBeenCalledWith(
-        'layer-1', 10, 20, 100, 50,
+      expect(mockCopySelectionToBlob).toHaveBeenCalledWith(
+        { x: 10, y: 20, w: 100, h: 50 },
       );
     });
 
@@ -196,20 +214,21 @@ describe('useKeyboardShortcuts', () => {
       expect(mockRequestRender).toHaveBeenCalledTimes(1);
     });
 
-    it('Cmd+V calls pasteClipboard with active layer', () => {
+    it('Cmd+V does nothing when no clipboard blob available', () => {
+      mockGetInternalClipboard.mockReturnValue(null);
       renderHook(() => useKeyboardShortcuts());
       fireKey('v', { metaKey: true });
 
-      expect(mockPasteClipboard).toHaveBeenCalledWith('layer-1', 0, 0);
-      expect(mockRequestRender).toHaveBeenCalledTimes(1);
+      // 클립보드가 없으면 pasteImageAsNewLayer 호출 안 됨
+      expect(mockPasteImageAsNewLayer).not.toHaveBeenCalled();
     });
 
-    it('Cmd+C does nothing when no selection', () => {
-      useEditorStore.setState({ selection: null });
+    it('Cmd+C does nothing when mask is empty', () => {
+      mockGetSelectionMask.mockReturnValue({ isEmpty: () => true, getBounds: () => null });
       renderHook(() => useKeyboardShortcuts());
       fireKey('c', { metaKey: true });
 
-      expect(mockCopySelection).not.toHaveBeenCalled();
+      expect(mockCopySelectionToBlob).not.toHaveBeenCalled();
     });
   });
 
