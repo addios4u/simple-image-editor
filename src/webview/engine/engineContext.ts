@@ -253,6 +253,16 @@ export function setLayerOffset(layerId: string, x: number, y: number): void {
   compositor.set_layer_offset(idx, x, y);
 }
 
+/**
+ * Bake the layer's offset into its pixel buffer and reset offset to (0, 0).
+ * After this call canvas coordinates == layer-local coordinates for this layer.
+ */
+export function bakeLayerOffset(layerId: string): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.bake_layer_offset(idx);
+}
+
 export function moveLayer(fromLayerId: string, toLayerId: string): void {
   const fromIdx = layerIndexMap.get(fromLayerId);
   const toIdx = layerIndexMap.get(toLayerId);

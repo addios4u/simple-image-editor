@@ -163,6 +163,42 @@ impl LayerCompositor {
         self.layers.get(index).map(|l| l.offset_y).unwrap_or(0)
     }
 
+    /// Bake the layer's offset into its pixel buffer and reset offset to (0, 0).
+    /// After this call, pixels that were at layer-local (lx, ly) will be at
+    /// layer-local (lx + offset_x, ly + offset_y), and offset becomes (0, 0).
+    /// This makes canvas coordinates equal to layer-local coordinates.
+    pub fn bake_layer_offset(&mut self, index: usize) {
+        if let Some(layer) = self.layers.get_mut(index) {
+            let off_x = layer.offset_x;
+            let off_y = layer.offset_y;
+            if off_x == 0 && off_y == 0 {
+                return;
+            }
+            let w = self.width as i32;
+            let h = self.height as i32;
+            let mut new_buf = vec![0u8; (w * h * 4) as usize];
+            let src = layer.buffer.raw_data();
+            for sy in 0..h {
+                for sx in 0..w {
+                    let dx = sx + off_x;
+                    let dy = sy + off_y;
+                    if dx < 0 || dx >= w || dy < 0 || dy >= h {
+                        continue;
+                    }
+                    let si = (sy * w + sx) as usize * 4;
+                    let di = (dy * w + dx) as usize * 4;
+                    new_buf[di]     = src[si];
+                    new_buf[di + 1] = src[si + 1];
+                    new_buf[di + 2] = src[si + 2];
+                    new_buf[di + 3] = src[si + 3];
+                }
+            }
+            layer.buffer = PixelBuffer::from_raw(self.width, self.height, new_buf);
+            layer.offset_x = 0;
+            layer.offset_y = 0;
+        }
+    }
+
     /// Remove a layer by index. Returns true if it was removed.
     pub fn remove_layer(&mut self, index: usize) -> bool {
         if index < self.layers.len() {

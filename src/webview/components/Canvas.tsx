@@ -447,26 +447,17 @@ const Canvas: React.FC = () => {
         const bounds = selMask.getBounds();
         if (!bounds) return;
 
-        const ftLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
-        const offX = ftLayer?.offsetX ?? 0;
-        const offY = ftLayer?.offsetY ?? 0;
-        const adjMask = adjustMaskForOffset(maskData, cw, ch, offX, offY);
-        const extracted = extractMaskedPixels(activeLayerId, adjMask);
+        bakeLayerOffset(activeLayerId);
+        useLayerStore.getState().setLayerOffset(activeLayerId, 0, 0);
+
+        const extracted = extractMaskedPixels(activeLayerId, maskData);
         if (!extracted) return;
 
         const { x: bx, y: by, width: bw, height: bh } = bounds;
-        const lbx = bx - offX;
-        const lby = by - offY;
         const originalPixels = new Uint8Array(bw * bh * 4);
         for (let row = 0; row < bh; row++) {
-          const ly = lby + row;
-          if (ly < 0 || ly >= ch) continue;
-          const colStart = Math.max(0, -lbx);
-          const colEnd = Math.min(bw, cw - lbx);
-          if (colStart >= colEnd) continue;
-          const srcOff = (ly * cw + Math.max(0, lbx)) * 4;
-          const dstOff = (row * bw + colStart) * 4;
-          originalPixels.set(extracted.subarray(srcOff, srcOff + (colEnd - colStart) * 4), dstOff);
+          const srcOff = ((by + row) * cw + bx) * 4;
+          originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
         }
 
         setFloatingLayer(originalPixels, bw, bh);
@@ -481,10 +472,10 @@ const Canvas: React.FC = () => {
           originalPixels,
           originalW: bw,
           originalH: bh,
-          originalX: lbx,
-          originalY: lby,
-          layerOffsetX: offX,
-          layerOffsetY: offY,
+          originalX: bx,
+          originalY: by,
+          layerOffsetX: 0,
+          layerOffsetY: 0,
           currentBounds: { x: bx, y: by, width: bw, height: bh },
           activeHandle: null,
           dragStartX: 0,
@@ -945,36 +936,27 @@ const Canvas: React.FC = () => {
                 const bounds = mask.getBounds();
                 if (!bounds) break;
 
-                const ftLayer = useLayerStore.getState().layers.find(l => l.id === activeLayerId);
-                const offX = ftLayer?.offsetX ?? 0;
-                const offY = ftLayer?.offsetY ?? 0;
+                // Bake layer offset: shift pixels into canvas-space coords and reset offset to (0,0).
+                // After baking, canvas coords == layer-local coords — no offset math needed.
+                bakeLayerOffset(activeLayerId);
+                useLayerStore.getState().setLayerOffset(activeLayerId, 0, 0);
 
-                // Mask is in canvas-space; convert to layer-local before extracting
-                const { canvasWidth: cw, canvasHeight: ch } = useEditorStore.getState();
-                const adjMask = adjustMaskForOffset(maskData, cw, ch, offX, offY);
-                const extracted = extractMaskedPixels(activeLayerId, adjMask);
+                const { canvasWidth: cw } = useEditorStore.getState();
+                const extracted = extractMaskedPixels(activeLayerId, maskData);
                 if (!extracted) break;
 
-                const { x: bx, y: by, width: bw, height: bh } = bounds;  // canvas-space
-                const lbx = bx - offX;  // layer-local
-                const lby = by - offY;
+                const { x: bx, y: by, width: bw, height: bh } = bounds;
                 const originalPixels = new Uint8Array(bw * bh * 4);
                 for (let row = 0; row < bh; row++) {
-                  const ly = lby + row;
-                  if (ly < 0 || ly >= ch) continue;
-                  const colStart = Math.max(0, -lbx);           // first valid dst col
-                  const colEnd = Math.min(bw, cw - lbx);        // last valid dst col + 1
-                  if (colStart >= colEnd) continue;
-                  const srcOff = (ly * cw + Math.max(0, lbx)) * 4;
-                  const dstOff = (row * bw + colStart) * 4;
-                  originalPixels.set(extracted.subarray(srcOff, srcOff + (colEnd - colStart) * 4), dstOff);
+                  const srcOff = ((by + row) * cw + bx) * 4;
+                  originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
                 }
 
                 setFloatingLayer(originalPixels, bw, bh);
-                setFloatingOffset(bx, by);  // floating offset is canvas-space for rendering
+                setFloatingOffset(bx, by);
                 requestRender();
 
-                // 선택 animation 제거: sharedContour, 마스크, selection 상태 모두 클리어
+                // 선택 animation 제거
                 sharedContour = null;
                 getSelectionMask()?.clear();
                 setSelection(null);
@@ -984,10 +966,10 @@ const Canvas: React.FC = () => {
                   originalPixels,
                   originalW: bw,
                   originalH: bh,
-                  originalX: lbx,  // layer-local
-                  originalY: lby,
-                  layerOffsetX: offX,
-                  layerOffsetY: offY,
+                  originalX: bx,  // canvas == layer-local after bake
+                  originalY: by,
+                  layerOffsetX: 0,
+                  layerOffsetY: 0,
                   currentBounds: { x: bx, y: by, width: bw, height: bh },
                   activeHandle: null,
                   dragStartX: 0,

@@ -84,6 +84,7 @@ export interface WasmLayerCompositor {
   set_layer_visible(index: number, visible: boolean): void;
   set_layer_blend_mode(index: number, mode: number): void;
   set_layer_offset(index: number, x: number, y: number): void;
+  bake_layer_offset(index: number): void;
   get_layer_offset_x(index: number): number;
   get_layer_offset_y(index: number): number;
   remove_layer(index: number): boolean;
