@@ -99,7 +99,7 @@ describe('AIPanel', () => {
     expect(screen.queryByRole('button', { name: /apply to canvas/i })).not.toBeInTheDocument();
   });
 
-  it('renders settings/configure button for API key', () => {
+  it('renders settings button', () => {
     render(<AIPanel />);
     expect(screen.getByTestId('ai-settings-btn')).toBeInTheDocument();
   });

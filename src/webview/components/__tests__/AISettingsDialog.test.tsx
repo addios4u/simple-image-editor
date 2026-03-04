@@ -12,7 +12,7 @@ describe('AISettingsDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('renders dialog with provider name', () => {
+  it('renders dialog with "AI Settings" header', () => {
     render(
       <AISettingsDialog
         provider="openai"
@@ -21,7 +21,19 @@ describe('AISettingsDialog', () => {
         onRemove={mockOnRemove}
       />
     );
-    expect(screen.getByText(/openai/i)).toBeInTheDocument();
+    expect(screen.getByText('AI Settings')).toBeInTheDocument();
+  });
+
+  it('displays provider name', () => {
+    render(
+      <AISettingsDialog
+        provider="openai"
+        onSave={mockOnSave}
+        onCancel={mockOnCancel}
+        onRemove={mockOnRemove}
+      />
+    );
+    expect(screen.getByText('OpenAI DALL-E')).toBeInTheDocument();
   });
 
   it('renders API key input with password type', () => {
@@ -36,6 +48,35 @@ describe('AISettingsDialog', () => {
     const input = screen.getByTestId('ai-api-key-input');
     expect(input).toBeInTheDocument();
     expect(input).toHaveAttribute('type', 'password');
+  });
+
+  it('eye toggle switches input type between password and text', () => {
+    render(
+      <AISettingsDialog
+        provider="openai"
+        onSave={mockOnSave}
+        onCancel={mockOnCancel}
+        onRemove={mockOnRemove}
+      />
+    );
+    const input = screen.getByTestId('ai-api-key-input');
+    expect(input).toHaveAttribute('type', 'password');
+
+    const eyeBtn = screen.getByRole('button', { name: /show key/i });
+    fireEvent.click(eyeBtn);
+    expect(input).toHaveAttribute('type', 'text');
+  });
+
+  it('shows SecretStorage hint text', () => {
+    render(
+      <AISettingsDialog
+        provider="openai"
+        onSave={mockOnSave}
+        onCancel={mockOnCancel}
+        onRemove={mockOnRemove}
+      />
+    );
+    expect(screen.getByText(/SecretStorage/)).toBeInTheDocument();
   });
 
   it('Save button calls onSave with key value', () => {
@@ -67,6 +108,21 @@ describe('AISettingsDialog', () => {
     );
     const cancelBtn = screen.getByRole('button', { name: /cancel/i });
     fireEvent.click(cancelBtn);
+
+    expect(mockOnCancel).toHaveBeenCalled();
+  });
+
+  it('Close button calls onCancel', () => {
+    render(
+      <AISettingsDialog
+        provider="openai"
+        onSave={mockOnSave}
+        onCancel={mockOnCancel}
+        onRemove={mockOnRemove}
+      />
+    );
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    fireEvent.click(closeBtn);
 
     expect(mockOnCancel).toHaveBeenCalled();
   });
@@ -107,6 +163,6 @@ describe('AISettingsDialog', () => {
         onRemove={mockOnRemove}
       />
     );
-    expect(screen.getByText(/google/i)).toBeInTheDocument();
+    expect(screen.getByText('Google Imagen')).toBeInTheDocument();
   });
 });

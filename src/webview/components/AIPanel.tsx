@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Sparkles, Settings, Layers } from 'lucide-react';
 import { useAIStore, AIProvider } from '../state/aiStore';
 import vscodeApi from '../vscode';
 import AISettingsDialog from './AISettingsDialog';
@@ -75,66 +76,80 @@ const AIPanel: React.FC = () => {
   }, [provider]);
 
   return (
-    <div className="sidebar-section" data-testid="ai-panel">
-      <div className="sidebar-section-title">AI Image Generation</div>
+    <div className="ai-panel" data-testid="ai-panel">
+      <div className="ai-body">
+        <div className="ai-section-title">AI Image Generation</div>
 
-      <div className="ai-controls">
-        <label htmlFor="ai-provider">Provider</label>
-        <select
-          id="ai-provider"
-          data-testid="ai-provider-select"
-          value={provider}
-          onChange={handleProviderChange}
-        >
-          <option value="openai">OpenAI DALL-E</option>
-          <option value="google">Google Imagen</option>
-        </select>
+        <div className="ai-field-group">
+          <label className="ai-field-label" htmlFor="ai-provider">Provider</label>
+          <select
+            id="ai-provider"
+            className="ai-select"
+            data-testid="ai-provider-select"
+            value={provider}
+            onChange={handleProviderChange}
+          >
+            <option value="openai">OpenAI DALL-E</option>
+            <option value="google">Google Imagen</option>
+          </select>
+        </div>
 
-        <label htmlFor="ai-prompt">Prompt</label>
-        <textarea
-          id="ai-prompt"
-          data-testid="ai-prompt-input"
-          value={prompt}
-          onChange={handlePromptChange}
-          placeholder="Describe the image you want to generate..."
-          rows={4}
-        />
+        <div className="ai-field-group">
+          <label className="ai-field-label" htmlFor="ai-prompt">Prompt</label>
+          <textarea
+            id="ai-prompt"
+            className="ai-textarea"
+            data-testid="ai-prompt-input"
+            value={prompt}
+            onChange={handlePromptChange}
+            placeholder="Describe the image you want to generate..."
+            rows={4}
+          />
+        </div>
 
-        <div className="ai-actions">
+        <div className="ai-btn-row">
           <button
+            className="ai-generate-btn"
             data-testid="ai-generate-btn"
             onClick={handleGenerate}
             disabled={isGenerating || prompt.trim() === ''}
           >
+            <Sparkles size={14} />
             {isGenerating ? 'Generating...' : 'Generate'}
           </button>
           <button
+            className="ai-settings-btn"
             data-testid="ai-settings-btn"
             onClick={() => setShowSettings(true)}
             title="Configure API Key"
+            aria-label="Settings"
           >
-            Settings
+            <Settings size={16} />
           </button>
         </div>
+
+        {error && (
+          <div className="ai-error" data-testid="ai-error">
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div className="ai-result">
+            <span className="ai-field-label">Result</span>
+            <img
+              data-testid="ai-result-preview"
+              src={`data:image/png;base64,${result}`}
+              alt="AI generated preview"
+              className="ai-preview-image"
+            />
+            <button className="ai-apply-btn" onClick={handleApplyToCanvas}>
+              <Layers size={14} />
+              Apply to Canvas
+            </button>
+          </div>
+        )}
       </div>
-
-      {error && (
-        <div className="ai-error" data-testid="ai-error">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <div className="ai-result">
-          <img
-            data-testid="ai-result-preview"
-            src={`data:image/png;base64,${result}`}
-            alt="AI generated preview"
-            className="ai-preview-image"
-          />
-          <button onClick={handleApplyToCanvas}>Apply to Canvas</button>
-        </div>
-      )}
 
       {showSettings && (
         <AISettingsDialog
