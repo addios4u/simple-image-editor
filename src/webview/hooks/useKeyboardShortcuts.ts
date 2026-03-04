@@ -10,11 +10,11 @@ import {
 import { getSelectionMask } from '../engine/selectionMask';
 import { hexToPackedRGBA } from '../engine/helpers';
 
-const TOOL_KEYS: Record<string, ToolType> = {
-  v: 'move',
-  m: 'select',
-  b: 'brush',
-  t: 'text',
+const TOOL_CODES: Record<string, ToolType> = {
+  KeyV: 'move',
+  KeyM: 'select',
+  KeyB: 'brush',
+  KeyT: 'text',
 };
 
 /** Convert canvas-coordinate mask to layer-local coordinates (mirrors Canvas.tsx helper). */
@@ -50,12 +50,12 @@ export function useKeyboardShortcuts(): void {
       }
 
       const isMod = e.metaKey || e.ctrlKey;
-      const key = e.key.toLowerCase();
+      const code = e.code;
 
       // --- Modifier shortcuts ---
       if (isMod) {
         // Undo / Redo
-        if (key === 'z') {
+        if (code === 'KeyZ') {
           e.preventDefault();
           if (e.shiftKey) {
             useHistoryStore.getState().redo();
@@ -66,7 +66,7 @@ export function useKeyboardShortcuts(): void {
         }
 
         // Copy
-        if (key === 'c') {
+        if (code === 'KeyC') {
           const mask = getSelectionMask();
           if (!mask || mask.isEmpty()) return;
           const bounds = mask.getBounds();
@@ -86,7 +86,7 @@ export function useKeyboardShortcuts(): void {
         }
 
         // Cut
-        if (key === 'x') {
+        if (code === 'KeyX') {
           const { selection } = useEditorStore.getState();
           if (!selection) return;
           const { activeLayerId } = useLayerStore.getState();
@@ -97,7 +97,7 @@ export function useKeyboardShortcuts(): void {
         }
 
         // Paste — creates new layer (same as context menu)
-        if (key === 'v' && !e.shiftKey) {
+        if (code === 'KeyV' && !e.shiftKey) {
           e.preventDefault();
           void (async () => {
             let blobToPaste: Blob | null = null;
@@ -180,7 +180,7 @@ export function useKeyboardShortcuts(): void {
       }
 
       // --- Single-key tool shortcuts (no modifier) ---
-      if (key === 'm') {
+      if (code === 'KeyM') {
         e.preventDefault();
         const store = useEditorStore.getState();
         if (store.activeTool === 'select') {
@@ -190,7 +190,7 @@ export function useKeyboardShortcuts(): void {
         }
         return;
       }
-      const tool = TOOL_KEYS[key];
+      const tool = TOOL_CODES[code];
       if (tool) {
         e.preventDefault();
         useEditorStore.getState().setActiveTool(tool);

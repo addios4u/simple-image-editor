@@ -20,7 +20,7 @@ import {
   addLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
   renderTextToLayer, bakeLayerOffset,
 } from '../engine/engineContext';
-import TextInputOverlay from './TextInputOverlay';
+import TextInputDialog from './TextInputDialog';
 import type { TextData } from '../state/layerStore';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
@@ -531,7 +531,7 @@ const Canvas: React.FC = () => {
       if (!isMod) return;
 
       // Cmd+T: initiate Free Transform (works with or without selection)
-      if (e.key.toLowerCase() === 't') {
+      if (e.code === 'KeyT') {
         e.preventDefault();
         const { selection, canvasWidth: cw, canvasHeight: ch, setSelection } = useEditorStore.getState();
         const { activeLayerId } = useLayerStore.getState();
@@ -862,10 +862,7 @@ const Canvas: React.FC = () => {
             />
           </div>
           {textOverlayState && (
-            <TextInputOverlay
-              x={textOverlayState.x}
-              y={textOverlayState.y}
-              zoom={zoom}
+            <TextInputDialog
               existing={textOverlayState.existing}
               onConfirm={handleTextConfirm}
               onCancel={handleTextCancel}
