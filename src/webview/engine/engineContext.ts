@@ -497,6 +497,27 @@ export function cropCanvas(x: number, y: number, w: number, h: number): void {
 }
 
 /**
+ * Bilinear resample srcData (srcW×srcH) to dstW×dstH.
+ * Returns a standalone Uint8Array of RGBA data (dstW*dstH*4 bytes).
+ */
+export function resampleBuffer(
+  srcData: Uint8Array,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): Uint8Array | null {
+  if (!compositor || !wasmMemory) return null;
+  if (dstW <= 0 || dstH <= 0) return null;
+  const result = compositor.resample_buffer(srcData, srcW, srcH, dstW, dstH);
+  const ptr = result.data_ptr();
+  const len = result.data_len();
+  const out = new Uint8Array(new Uint8Array(wasmMemory.buffer, ptr, len));
+  result.free();
+  return out;
+}
+
+/**
  * Copy the selection region from the currently rendered canvas to a PNG Blob.
  * Uses the bound canvasCtx to read pixels directly — no WASM extraction needed.
  */

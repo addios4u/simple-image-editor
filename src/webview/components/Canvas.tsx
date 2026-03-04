@@ -17,7 +17,7 @@ import {
   captureLayerRegion, restoreLayerRegion,
   clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
   cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
-  addLayer,
+  addLayer, resampleBuffer,
 } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
@@ -129,6 +129,49 @@ function toToolEvent(
   };
 }
 
+type HandleId = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' | 'move';
+
+interface FreeTransformState {
+  layerId: string;
+  originalPixels: Uint8Array;
+  originalW: number;
+  originalH: number;
+  originalX: number;
+  originalY: number;
+  currentBounds: { x: number; y: number; width: number; height: number };
+  activeHandle: HandleId | null;
+  dragStartX: number;
+  dragStartY: number;
+  boundsAtDragStart: { x: number; y: number; width: number; height: number };
+}
+
+function getHitHandle(
+  x: number,
+  y: number,
+  bounds: { x: number; y: number; width: number; height: number },
+  zoom: number,
+): HandleId | null {
+  const HANDLE_RADIUS = 6 / zoom;
+  const { x: bx, y: by, width: bw, height: bh } = bounds;
+  const handles: Array<{ id: HandleId; hx: number; hy: number }> = [
+    { id: 'tl', hx: bx,          hy: by },
+    { id: 't',  hx: bx + bw / 2, hy: by },
+    { id: 'tr', hx: bx + bw,     hy: by },
+    { id: 'r',  hx: bx + bw,     hy: by + bh / 2 },
+    { id: 'br', hx: bx + bw,     hy: by + bh },
+    { id: 'b',  hx: bx + bw / 2, hy: by + bh },
+    { id: 'bl', hx: bx,          hy: by + bh },
+    { id: 'l',  hx: bx,          hy: by + bh / 2 },
+  ];
+  for (const h of handles) {
+    if (Math.abs(x - h.hx) <= HANDLE_RADIUS && Math.abs(y - h.hy) <= HANDLE_RADIUS) {
+      return h.id;
+    }
+  }
+  if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) return 'move';
+  return null;
+}
+
 const Canvas: React.FC = () => {
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
@@ -142,6 +185,13 @@ const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<{ type: ToolType; instance: BaseTool } | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [freeTransformState, setFreeTransformState] = useState<FreeTransformState | null>(null);
+  const freeTransformRef = useRef<FreeTransformState | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    freeTransformRef.current = freeTransformState;
+  }, [freeTransformState]);
   const fillColor = useEditorStore((s) => s.fillColor);
   const strokeColor = useEditorStore((s) => s.strokeColor);
   const strokeWidth = useEditorStore((s) => s.strokeWidth);
@@ -229,6 +279,38 @@ const Canvas: React.FC = () => {
           }
           ctx.restore();
         }
+
+        // Free Transform handles
+        const tf = freeTransformRef.current;
+        if (tf) {
+          const { x, y, width: bw, height: bh } = tf.currentBounds;
+          ctx.save();
+          ctx.strokeStyle = '#0088ff';
+          ctx.lineWidth = 1 / zoom;
+          ctx.setLineDash([5 / zoom, 3 / zoom]);
+          ctx.strokeRect(x, y, bw, bh);
+          ctx.setLineDash([]);
+
+          const handles = [
+            { hx: x,         hy: y },
+            { hx: x + bw / 2, hy: y },
+            { hx: x + bw,    hy: y },
+            { hx: x + bw,    hy: y + bh / 2 },
+            { hx: x + bw,    hy: y + bh },
+            { hx: x + bw / 2, hy: y + bh },
+            { hx: x,         hy: y + bh },
+            { hx: x,         hy: y + bh / 2 },
+          ];
+          const hs = 4 / zoom;
+          for (const h of handles) {
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#0088ff';
+            ctx.lineWidth = 1 / zoom;
+            ctx.fillRect(h.hx - hs, h.hy - hs, hs * 2, hs * 2);
+            ctx.strokeRect(h.hx - hs, h.hy - hs, hs * 2, hs * 2);
+          }
+          ctx.restore();
+        }
       }
       antsRafRef.current = requestAnimationFrame(animate);
     };
@@ -237,7 +319,47 @@ const Canvas: React.FC = () => {
     return () => {
       cancelAnimationFrame(antsRafRef.current);
     };
-  }, [canvasWidth, canvasHeight]);
+  }, [canvasWidth, canvasHeight, zoom]);
+
+  // Free Transform keyboard handler (Enter = commit, Escape = cancel)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tf = freeTransformRef.current;
+      if (!tf) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const { currentBounds, originalPixels, originalW, originalH, layerId } = tf;
+        const resampled = resampleBuffer(
+          originalPixels, originalW, originalH,
+          currentBounds.width, currentBounds.height,
+        );
+        if (resampled) {
+          stampBufferOntoLayer(
+            layerId, resampled,
+            currentBounds.width, currentBounds.height,
+            currentBounds.x, currentBounds.y,
+          );
+        }
+        clearFloatingLayer();
+        setFreeTransformState(null);
+        freeTransformRef.current = null;
+        useEditorStore.getState().setSelection(null);
+        requestRender();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        const { originalPixels, originalW, originalH, layerId, originalX, originalY } = tf;
+        stampBufferOntoLayer(layerId, originalPixels, originalW, originalH, originalX, originalY);
+        clearFloatingLayer();
+        setFreeTransformState(null);
+        freeTransformRef.current = null;
+        requestRender();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const tool = useMemo(() => {
     if (!toolRef.current || toolRef.current.type !== activeTool) {
@@ -250,7 +372,29 @@ const Canvas: React.FC = () => {
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       e.currentTarget.setPointerCapture(e.pointerId);
-      tool.onPointerDown(toToolEvent(e, zoom));
+      const evt = toToolEvent(e, zoom);
+
+      const tf = freeTransformRef.current;
+      if (tf) {
+        const hit = getHitHandle(evt.x, evt.y, tf.currentBounds, zoom);
+        if (hit) {
+          setFreeTransformState((prev) => {
+            if (!prev) return prev;
+            const next: FreeTransformState = {
+              ...prev,
+              activeHandle: hit,
+              dragStartX: evt.x,
+              dragStartY: evt.y,
+              boundsAtDragStart: { ...prev.currentBounds },
+            };
+            freeTransformRef.current = next;
+            return next;
+          });
+          return;
+        }
+      }
+
+      tool.onPointerDown(evt);
     },
     [tool, zoom],
   );
@@ -258,8 +402,59 @@ const Canvas: React.FC = () => {
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       const evt = toToolEvent(e, zoom);
-      tool.onPointerMove(evt);
       setCursorPos({ x: Math.round(evt.x), y: Math.round(evt.y) });
+
+      const tf = freeTransformRef.current;
+      if (tf && tf.activeHandle) {
+        const dx = evt.x - tf.dragStartX;
+        const dy = evt.y - tf.dragStartY;
+        const { x: bx, y: by, width: bw, height: bh } = tf.boundsAtDragStart;
+        let nx = bx, ny = by, nw = bw, nh = bh;
+
+        switch (tf.activeHandle) {
+          case 'move': nx = bx + dx; ny = by + dy; break;
+          case 'tl':   nx = bx + dx; ny = by + dy; nw = bw - dx; nh = bh - dy; break;
+          case 't':    ny = by + dy; nh = bh - dy; break;
+          case 'tr':   ny = by + dy; nw = bw + dx; nh = bh - dy; break;
+          case 'r':    nw = bw + dx; break;
+          case 'br':   nw = bw + dx; nh = bh + dy; break;
+          case 'b':    nh = bh + dy; break;
+          case 'bl':   nx = bx + dx; nw = bw - dx; nh = bh + dy; break;
+          case 'l':    nx = bx + dx; nw = bw - dx; break;
+        }
+
+        if (nw < 4) { if (tf.activeHandle.includes('l')) nx = bx + bw - 4; nw = 4; }
+        if (nh < 4) { if (tf.activeHandle.includes('t')) ny = by + bh - 4; nh = 4; }
+
+        const newBounds = {
+          x: Math.round(nx),
+          y: Math.round(ny),
+          width: Math.round(nw),
+          height: Math.round(nh),
+        };
+
+        if (newBounds.width > 0 && newBounds.height > 0) {
+          const resampled = resampleBuffer(
+            tf.originalPixels, tf.originalW, tf.originalH,
+            newBounds.width, newBounds.height,
+          );
+          if (resampled) {
+            setFloatingLayer(resampled, newBounds.width, newBounds.height);
+            setFloatingOffset(newBounds.x, newBounds.y);
+            requestRender();
+          }
+        }
+
+        setFreeTransformState((prev) => {
+          if (!prev) return prev;
+          const next: FreeTransformState = { ...prev, currentBounds: newBounds };
+          freeTransformRef.current = next;
+          return next;
+        });
+        return;
+      }
+
+      tool.onPointerMove(evt);
     },
     [tool, zoom],
   );
@@ -267,7 +462,19 @@ const Canvas: React.FC = () => {
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       e.currentTarget.releasePointerCapture(e.pointerId);
-      tool.onPointerUp(toToolEvent(e, zoom));
+      const evt = toToolEvent(e, zoom);
+
+      if (freeTransformRef.current?.activeHandle) {
+        setFreeTransformState((prev) => {
+          if (!prev) return prev;
+          const next: FreeTransformState = { ...prev, activeHandle: null };
+          freeTransformRef.current = next;
+          return next;
+        });
+        return;
+      }
+
+      tool.onPointerUp(evt);
     },
     [tool, zoom],
   );
@@ -516,7 +723,42 @@ const Canvas: React.FC = () => {
                 break;
               }
               case 'freeTransform': {
-                console.log('Free Transform: 추후 구현');
+                if (!maskData || !activeLayerId || !selection) break;
+                const mask = getSelectionMask()!;
+                const bounds = mask.getBounds();
+                if (!bounds) break;
+
+                const extracted = extractMaskedPixels(activeLayerId, maskData);
+                if (!extracted) break;
+
+                const { x: bx, y: by, width: bw, height: bh } = bounds;
+                const imgW = useEditorStore.getState().canvasWidth;
+                const originalPixels = new Uint8Array(bw * bh * 4);
+                for (let row = 0; row < bh; row++) {
+                  const srcOff = ((by + row) * imgW + bx) * 4;
+                  const dstOff = row * bw * 4;
+                  originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), dstOff);
+                }
+
+                setFloatingLayer(originalPixels, bw, bh);
+                setFloatingOffset(bx, by);
+                requestRender();
+
+                const transformState: FreeTransformState = {
+                  layerId: activeLayerId,
+                  originalPixels,
+                  originalW: bw,
+                  originalH: bh,
+                  originalX: bx,
+                  originalY: by,
+                  currentBounds: { x: bx, y: by, width: bw, height: bh },
+                  activeHandle: null,
+                  dragStartX: 0,
+                  dragStartY: 0,
+                  boundsAtDragStart: { x: bx, y: by, width: bw, height: bh },
+                };
+                setFreeTransformState(transformState);
+                freeTransformRef.current = transformState;
                 break;
               }
             }

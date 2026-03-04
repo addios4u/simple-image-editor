@@ -123,6 +123,7 @@ export interface WasmLayerCompositor {
   fill_masked_pixels(layer_idx: number, mask: Uint8Array, r: number, g: number, b: number, a: number): void;
   stroke_masked_boundary(layer_idx: number, mask: Uint8Array, r: number, g: number, b: number, a: number, width: number): void;
   crop_canvas(x: number, y: number, w: number, h: number): void;
+  resample_buffer(src: Uint8Array, src_w: number, src_h: number, dst_w: number, dst_h: number): WasmPixelBuffer;
   free(): void;
 }
 

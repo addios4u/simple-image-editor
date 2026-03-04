@@ -707,6 +707,47 @@ impl LayerCompositor {
         }
     }
 
+    /// Bilinear resampling: resample src_data (src_w×src_h) to dst_w×dst_h.
+    pub fn resample_buffer(&self, src: &[u8], src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> PixelBuffer {
+        let sw = src_w as usize;
+        let sh = src_h as usize;
+        let dw = dst_w as usize;
+        let dh = dst_h as usize;
+        let mut out = vec![0u8; dw * dh * 4];
+
+        for dy in 0..dh {
+            for dx in 0..dw {
+                let sx = (dx as f32 + 0.5) * sw as f32 / dw as f32 - 0.5;
+                let sy = (dy as f32 + 0.5) * sh as f32 / dh as f32 - 0.5;
+                let x0 = sx.floor() as i64;
+                let y0 = sy.floor() as i64;
+                let fx = sx - sx.floor();
+                let fy = sy - sy.floor();
+
+                let mut rgba = [0f32; 4];
+                for &(ky, wby) in &[(y0, 1.0 - fy), (y0 + 1, fy)] {
+                    for &(kx, wbx) in &[(x0, 1.0 - fx), (x0 + 1, fx)] {
+                        let w = wby * wbx;
+                        let cx = kx.clamp(0, (sw as i64) - 1) as usize;
+                        let cy = ky.clamp(0, (sh as i64) - 1) as usize;
+                        let p = (cy * sw + cx) * 4;
+                        if p + 3 < src.len() {
+                            for c in 0..4 {
+                                rgba[c] += src[p + c] as f32 * w;
+                            }
+                        }
+                    }
+                }
+
+                let dp = (dy * dw + dx) * 4;
+                for c in 0..4 {
+                    out[dp + c] = rgba[c].round().clamp(0.0, 255.0) as u8;
+                }
+            }
+        }
+        PixelBuffer::from_raw(dst_w, dst_h, out)
+    }
+
     /// Crop the canvas to the rectangle (x, y, w, h).
     /// All layers are re-created with the new dimensions.
     /// Each layer's offset is taken into account when copying pixels.
