@@ -19,6 +19,18 @@ export interface HistoryEntry {
   timestamp: number;
 }
 
+export interface ActionData {
+  undo: () => void;
+  redo: () => void;
+}
+
+const actionStore = new Map<string, ActionData>();
+
+/** Expose the action store for testing only. */
+export function _getActionStore(): Map<string, ActionData> {
+  return actionStore;
+}
+
 export interface SnapshotData {
   layerId: string;
   region: { x: number; y: number; w: number; h: number };
@@ -48,6 +60,7 @@ function freeSnapshots(ids: string[]): void {
       snap.after?.free();
       snapshotStore.delete(id);
     }
+    actionStore.delete(id);
   }
 }
 
@@ -66,6 +79,7 @@ interface HistoryState {
     maskBefore?: Uint8Array,
   ) => string;
   commitSnapshot: (entryId: string, after: WasmRegionSnapshot, maskAfter?: Uint8Array) => void;
+  pushEditWithAction: (label: string, undoFn: () => void, redoFn: () => void) => string;
   undo: () => HistoryEntry | null;
   redo: () => HistoryEntry | null;
   getHistory: () => HistoryEntry[];
@@ -159,6 +173,40 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     }
   },
 
+  pushEditWithAction: (label, undoFn, redoFn) => {
+    const entryId = `history-${nextId++}`;
+    const entry: HistoryEntry = {
+      id: entryId,
+      label,
+      timestamp: Date.now(),
+    };
+
+    actionStore.set(entryId, { undo: undoFn, redo: redoFn });
+
+    set((state) => {
+      let undoStack = [...state.undoStack, entry];
+
+      const clearedRedoIds = state.redoStack.map((e) => e.id);
+      if (clearedRedoIds.length > 0) {
+        freeSnapshots(clearedRedoIds);
+      }
+
+      if (undoStack.length > MAX_HISTORY) {
+        const dropped = undoStack.slice(0, undoStack.length - MAX_HISTORY);
+        freeSnapshots(dropped.map((e) => e.id));
+        undoStack = undoStack.slice(undoStack.length - MAX_HISTORY);
+      }
+      return {
+        undoStack,
+        redoStack: [],
+        canUndo: undoStack.length > 0,
+        canRedo: false,
+      };
+    });
+
+    return entryId;
+  },
+
   undo: () => {
     const state = get();
     if (state.undoStack.length === 0) return null;
@@ -169,12 +217,16 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
     // Restore before snapshot if available
     const snap = snapshotStore.get(entry.id);
+    const action = actionStore.get(entry.id);
     if (snap) {
       restoreLayerRegion(snap.layerId, snap.before);
       // Restore mask state if available (selection-move undo)
       if (snap.maskBefore) {
         restoreMaskFromSnapshot(snap.maskBefore);
       }
+      requestRender();
+    } else if (action) {
+      action.undo();
       requestRender();
     }
 
@@ -198,12 +250,16 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
     // Restore after snapshot if available
     const snap = snapshotStore.get(entry.id);
+    const action = actionStore.get(entry.id);
     if (snap?.after) {
       restoreLayerRegion(snap.layerId, snap.after);
       // Restore mask state if available (selection-move redo)
       if (snap.maskAfter) {
         restoreMaskFromSnapshot(snap.maskAfter);
       }
+      requestRender();
+    } else if (action) {
+      action.redo();
       requestRender();
     }
 
@@ -258,13 +314,14 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     }),
 
   clear: () => {
-    // Free all snapshots
+    // Free all snapshots and actions
     const state = get();
     const allIds = [
       ...state.undoStack.map((e) => e.id),
       ...state.redoStack.map((e) => e.id),
     ];
     freeSnapshots(allIds);
+    actionStore.clear();
 
     set({
       undoStack: [],
