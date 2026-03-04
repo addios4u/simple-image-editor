@@ -1039,6 +1039,7 @@ const Canvas: React.FC = () => {
                 if (ok) {
                   useLayerStore.getState().setActiveLayer(newLayer.id);
                   useLayerStore.getState().bumpThumbnailVersion();
+                  useHistoryStore.getState().pushEdit('Paste');
                   requestRender();
                 } else {
                   useLayerStore.getState().removeLayer(newLayer.id);

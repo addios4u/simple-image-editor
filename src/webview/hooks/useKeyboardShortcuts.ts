@@ -125,6 +125,7 @@ export function useKeyboardShortcuts(): void {
             if (ok) {
               useLayerStore.getState().setActiveLayer(newLayer.id);
               useLayerStore.getState().bumpThumbnailVersion();
+              useHistoryStore.getState().pushEdit('Paste');
               requestRender();
             } else {
               useLayerStore.getState().removeLayer(newLayer.id);

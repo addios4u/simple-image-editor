@@ -39,6 +39,9 @@ let canvasHeight = 0;
 /** Maps UI layer id → WASM compositor layer index. */
 const layerIndexMap = new Map<string, number>();
 
+/** Tracks each layer's current offset for coordinate adjustments (e.g. brush). */
+const layerOffsetMap = new Map<string, { x: number; y: number }>();
+
 /** Module-level internal clipboard for copy/paste across shortcuts and context menu. */
 let internalClipboardBlob: Blob | null = null;
 export function setInternalClipboard(blob: Blob): void { internalClipboardBlob = blob; }
@@ -118,8 +121,10 @@ export function loadImage(
 
   // Add background layer and paste decoded pixels.
   layerIndexMap.clear();
+  layerOffsetMap.clear();
   const idx = compositor.add_layer();
   layerIndexMap.set(layerId, idx);
+  layerOffsetMap.set(layerId, { x: 0, y: 0 });
 
   // Copy decoded pixels into the layer via set_layer_data.
   // Must copy to a standalone Uint8Array first — set_layer_data internally
@@ -164,6 +169,7 @@ export function loadOraData(oraBytes: Uint8Array): {
   canvasWidth = ora.width;
   canvasHeight = ora.height;
   layerIndexMap.clear();
+  layerOffsetMap.clear();
 
   const layers: OraLayerInfo[] = [];
 
@@ -173,6 +179,7 @@ export function loadOraData(oraBytes: Uint8Array): {
     const decoded = decodeImage(oraLayer.pngData);
     const idx = compositor.add_layer();
     layerIndexMap.set(layerId, idx);
+    layerOffsetMap.set(layerId, { x: 0, y: 0 });
 
     // Copy decoded pixels into the compositor layer.
     // Must copy to a standalone Uint8Array first — set_layer_data internally
@@ -208,6 +215,7 @@ export function addLayer(layerId: string): number {
   if (!compositor) return -1;
   const idx = compositor.add_layer();
   layerIndexMap.set(layerId, idx);
+  layerOffsetMap.set(layerId, { x: 0, y: 0 });
   return idx;
 }
 
@@ -216,6 +224,7 @@ export function removeLayer(layerId: string): void {
   if (idx === undefined || !compositor) return;
   compositor.remove_layer(idx);
   layerIndexMap.delete(layerId);
+  layerOffsetMap.delete(layerId);
 
   // Re-index: every layer after the removed one shifts down by 1.
   for (const [id, i] of layerIndexMap) {
@@ -251,6 +260,7 @@ export function setLayerOffset(layerId: string, x: number, y: number): void {
   const idx = layerIndexMap.get(layerId);
   if (idx === undefined || !compositor) return;
   compositor.set_layer_offset(idx, x, y);
+  layerOffsetMap.set(layerId, { x, y });
 }
 
 /**
@@ -261,6 +271,7 @@ export function bakeLayerOffset(layerId: string): void {
   const idx = layerIndexMap.get(layerId);
   if (idx === undefined || !compositor) return;
   compositor.bake_layer_offset(idx);
+  layerOffsetMap.set(layerId, { x: 0, y: 0 });
 }
 
 export function moveLayer(fromLayerId: string, toLayerId: string): void {
@@ -286,7 +297,9 @@ export function brushStrokeLayer(
 ): void {
   const idx = layerIndexMap.get(layerId);
   if (idx === undefined || !compositor) return;
-  compositor.brush_stroke_layer(idx, cx, cy, color, size, hardness);
+  // Convert canvas coords → layer-local coords by subtracting layer offset
+  const offset = layerOffsetMap.get(layerId) ?? { x: 0, y: 0 };
+  compositor.brush_stroke_layer(idx, cx - offset.x, cy - offset.y, color, size, hardness);
 }
 
 /**
