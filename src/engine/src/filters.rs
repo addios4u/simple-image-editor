@@ -263,7 +263,9 @@ pub fn motion_blur_region(buffer: &mut PixelBuffer, angle: f32, distance: u32, r
 
 /// Apply a motion blur at the given angle (degrees) and distance to the buffer (in-place).
 /// Samples pixels along the direction vector defined by the angle.
-/// Alpha channel is preserved unchanged.
+/// Operates in premultiplied alpha space to prevent transparent pixels from
+/// darkening adjacent opaque pixels (inner shadow artifact).
+/// Alpha channel is also blurred to create soft edges.
 #[wasm_bindgen]
 pub fn motion_blur(buffer: &mut PixelBuffer, angle: f32, distance: u32) {
     if distance == 0 {
@@ -282,37 +284,53 @@ pub fn motion_blur(buffer: &mut PixelBuffer, angle: f32, distance: u32) {
     let num_samples = (distance * 2 + 1) as usize;
     let half = distance as f32;
 
+    // Convert to premultiplied alpha
     let data = buffer.raw_data().to_vec();
+    let mut pre = vec![0u8; w * h * 4];
+    for i in 0..w * h {
+        let a = data[i * 4 + 3] as f32 / 255.0;
+        pre[i * 4]     = (data[i * 4]     as f32 * a).round() as u8;
+        pre[i * 4 + 1] = (data[i * 4 + 1] as f32 * a).round() as u8;
+        pre[i * 4 + 2] = (data[i * 4 + 2] as f32 * a).round() as u8;
+        pre[i * 4 + 3] = data[i * 4 + 3];
+    }
+
     let out = buffer.raw_data_mut();
 
     for y in 0..h {
         for x in 0..w {
-            let mut sum_r: f32 = 0.0;
-            let mut sum_g: f32 = 0.0;
-            let mut sum_b: f32 = 0.0;
-            let mut count: f32 = 0.0;
+            let mut sum = [0.0f32; 4];
 
             for s in 0..num_samples {
                 let offset = s as f32 - half;
                 let sx = (x as f32 + offset * dx).round();
                 let sy = (y as f32 + offset * dy).round();
 
-                // Clamp to buffer boundaries
                 let csx = sx.clamp(0.0, (w as f32) - 1.0) as usize;
                 let csy = sy.clamp(0.0, (h as f32) - 1.0) as usize;
 
                 let idx = (csy * w + csx) * 4;
-                sum_r += data[idx] as f32;
-                sum_g += data[idx + 1] as f32;
-                sum_b += data[idx + 2] as f32;
-                count += 1.0;
+                sum[0] += pre[idx]     as f32;
+                sum[1] += pre[idx + 1] as f32;
+                sum[2] += pre[idx + 2] as f32;
+                sum[3] += pre[idx + 3] as f32;
             }
 
+            let count = num_samples as f32;
             let dst = (y * w + x) * 4;
-            out[dst] = (sum_r / count).round().clamp(0.0, 255.0) as u8;
-            out[dst + 1] = (sum_g / count).round().clamp(0.0, 255.0) as u8;
-            out[dst + 2] = (sum_b / count).round().clamp(0.0, 255.0) as u8;
-            out[dst + 3] = data[dst + 3]; // preserve alpha
+            let a_pre = sum[3] / count;
+
+            // Unmultiply back to straight alpha
+            if a_pre > 0.0 {
+                out[dst]     = (sum[0] / count / a_pre * 255.0).round().clamp(0.0, 255.0) as u8;
+                out[dst + 1] = (sum[1] / count / a_pre * 255.0).round().clamp(0.0, 255.0) as u8;
+                out[dst + 2] = (sum[2] / count / a_pre * 255.0).round().clamp(0.0, 255.0) as u8;
+            } else {
+                out[dst]     = 0;
+                out[dst + 1] = 0;
+                out[dst + 2] = 0;
+            }
+            out[dst + 3] = a_pre.round().clamp(0.0, 255.0) as u8;
         }
     }
 }
