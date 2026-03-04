@@ -37,7 +37,10 @@ vi.mock('../../state/historyStore', () => ({
 
 // layerStore 모킹
 vi.mock('../../state/layerStore', () => ({
-  useLayerStore: (selector: any) => selector({ activeLayerId: 'layer-1', layers: [] }),
+  useLayerStore: (selector: any) => selector({
+    activeLayerId: 'layer-1',
+    layers: [{ id: 'layer-1', offsetX: 0, offsetY: 0 }],
+  }),
 }));
 
 // editorStore 모킹 — 기본: 선택 영역 없음

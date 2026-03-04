@@ -33,6 +33,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
   const canvasWidth = useEditorStore((s) => s.canvasWidth);
   const canvasHeight = useEditorStore((s) => s.canvasHeight);
   const activeLayerId = useLayerStore((s) => s.activeLayerId);
+  const layers = useLayerStore((s) => s.layers);
+  const activeLayer = layers.find((l) => l.id === activeLayerId);
+  const layerOffsetX = activeLayer?.offsetX ?? 0;
+  const layerOffsetY = activeLayer?.offsetY ?? 0;
 
   const [sigma, setSigma] = useState(3.0);
   const [angle, setAngle] = useState(0);
@@ -111,13 +115,22 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
 
     if (filterType === 'gaussian') {
       if (selection) {
-        gaussianBlurLayerRegion(activeLayerId, sigma, selection.x, selection.y, selection.width, selection.height);
+        // 캔버스 좌표 → 레이어-로컬 좌표 변환 (레이어 오프셋 보정)
+        const lx = Math.max(0, selection.x - layerOffsetX);
+        const ly = Math.max(0, selection.y - layerOffsetY);
+        const lw = Math.min(selection.width, canvasWidth - lx);
+        const lh = Math.min(selection.height, canvasHeight - ly);
+        if (lw > 0 && lh > 0) gaussianBlurLayerRegion(activeLayerId, sigma, lx, ly, lw, lh);
       } else {
         gaussianBlurLayer(activeLayerId, sigma);
       }
     } else {
       if (selection) {
-        motionBlurLayerRegion(activeLayerId, angle, distance, selection.x, selection.y, selection.width, selection.height);
+        const lx = Math.max(0, selection.x - layerOffsetX);
+        const ly = Math.max(0, selection.y - layerOffsetY);
+        const lw = Math.min(selection.width, canvasWidth - lx);
+        const lh = Math.min(selection.height, canvasHeight - ly);
+        if (lw > 0 && lh > 0) motionBlurLayerRegion(activeLayerId, angle, distance, lx, ly, lw, lh);
       } else {
         motionBlurLayer(activeLayerId, angle, distance);
       }
@@ -135,7 +148,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
 
     requestRender();
     onClose();
-  }, [activeLayerId, filterType, sigma, angle, distance, selection, canvasWidth, canvasHeight, onClose]);
+  }, [activeLayerId, filterType, sigma, angle, distance, selection, canvasWidth, canvasHeight, layerOffsetX, layerOffsetY, onClose]);
 
   const { w: pvW, h: pvH } = previewDimsRef.current;
 
