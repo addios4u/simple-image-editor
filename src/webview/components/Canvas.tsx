@@ -82,6 +82,27 @@ let sharedContour: Array<Array<[number, number]>> | null = null;
 // Source canvas for free transform overlay rendering (originalPixels pre-rendered).
 let sharedFloatingSrcCanvas: HTMLCanvasElement | null = null;
 
+/** 픽셀 버퍼에서 알파 > 0인 픽셀의 tight bounding box를 반환. */
+function tightBounds(
+  pixels: Uint8Array,
+  w: number,
+  h: number,
+): { x: number; y: number; width: number; height: number } | null {
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (pixels[(y * w + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
 // Module-level opener — set by Canvas component on mount.
 let _openTextEditor: ((x: number, y: number, layerId: string | null, existing?: TextData) => void) | null = null;
 
@@ -542,17 +563,28 @@ const Canvas: React.FC = () => {
           bx = 0; by = 0; bw = cw; bh = ch;
         }
 
-        const originalPixels = new Uint8Array(bw * bh * 4);
+        const rawPixels = new Uint8Array(bw * bh * 4);
         for (let row = 0; row < bh; row++) {
           const srcOff = ((by + row) * cw + bx) * 4;
-          originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
+          rawPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
+        }
+
+        // Crop to tight non-transparent bounding box
+        const tight = tightBounds(rawPixels, bw, bh);
+        if (!tight) return;
+        const tbx = bx + tight.x, tby = by + tight.y;
+        const tbw = tight.width, tbh = tight.height;
+        const originalPixels = new Uint8Array(tbw * tbh * 4);
+        for (let row = 0; row < tbh; row++) {
+          const srcOff = ((tight.y + row) * bw + tight.x) * 4;
+          originalPixels.set(rawPixels.subarray(srcOff, srcOff + tbw * 4), row * tbw * 4);
         }
 
         // Build source canvas for overlay rendering
         const srcCvs = document.createElement('canvas');
-        srcCvs.width = bw; srcCvs.height = bh;
+        srcCvs.width = tbw; srcCvs.height = tbh;
         srcCvs.getContext('2d')!.putImageData(
-          new ImageData(new Uint8ClampedArray(originalPixels), bw, bh), 0, 0,
+          new ImageData(new Uint8ClampedArray(originalPixels), tbw, tbh), 0, 0,
         );
         sharedFloatingSrcCanvas = srcCvs;
         requestRender();
@@ -560,20 +592,20 @@ const Canvas: React.FC = () => {
         const transformState: FreeTransformState = {
           layerId: activeLayerId,
           originalPixels,
-          originalW: bw,
-          originalH: bh,
-          originalX: bx,
-          originalY: by,
+          originalW: tbw,
+          originalH: tbh,
+          originalX: tbx,
+          originalY: tby,
           layerOffsetX: 0,
           layerOffsetY: 0,
           rotation: 0,
           rotationAtDragStart: 0,
           dragStartAngle: 0,
-          currentBounds: { x: bx, y: by, width: bw, height: bh },
+          currentBounds: { x: tbx, y: tby, width: tbw, height: tbh },
           activeHandle: null,
           dragStartX: 0,
           dragStartY: 0,
-          boundsAtDragStart: { x: bx, y: by, width: bw, height: bh },
+          boundsAtDragStart: { x: tbx, y: tby, width: tbw, height: tbh },
         };
         setFreeTransformState(transformState);
         freeTransformRef.current = transformState;
@@ -1067,17 +1099,28 @@ const Canvas: React.FC = () => {
                 if (!extracted) break;
 
                 const { x: bx, y: by, width: bw, height: bh } = bounds;
-                const originalPixels = new Uint8Array(bw * bh * 4);
+                const rawPixels = new Uint8Array(bw * bh * 4);
                 for (let row = 0; row < bh; row++) {
                   const srcOff = ((by + row) * cw + bx) * 4;
-                  originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
+                  rawPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
+                }
+
+                // Crop to tight non-transparent bounding box
+                const tight = tightBounds(rawPixels, bw, bh);
+                if (!tight) break;
+                const tbx = bx + tight.x, tby = by + tight.y;
+                const tbw = tight.width, tbh = tight.height;
+                const originalPixels = new Uint8Array(tbw * tbh * 4);
+                for (let row = 0; row < tbh; row++) {
+                  const srcOff = ((tight.y + row) * bw + tight.x) * 4;
+                  originalPixels.set(rawPixels.subarray(srcOff, srcOff + tbw * 4), row * tbw * 4);
                 }
 
                 // Build source canvas for overlay rendering (no WASM floating layer)
                 const srcCvs = document.createElement('canvas');
-                srcCvs.width = bw; srcCvs.height = bh;
+                srcCvs.width = tbw; srcCvs.height = tbh;
                 srcCvs.getContext('2d')!.putImageData(
-                  new ImageData(new Uint8ClampedArray(originalPixels), bw, bh), 0, 0,
+                  new ImageData(new Uint8ClampedArray(originalPixels), tbw, tbh), 0, 0,
                 );
                 sharedFloatingSrcCanvas = srcCvs;
                 requestRender();
@@ -1090,20 +1133,20 @@ const Canvas: React.FC = () => {
                 const transformState: FreeTransformState = {
                   layerId: activeLayerId,
                   originalPixels,
-                  originalW: bw,
-                  originalH: bh,
-                  originalX: bx,
-                  originalY: by,
+                  originalW: tbw,
+                  originalH: tbh,
+                  originalX: tbx,
+                  originalY: tby,
                   layerOffsetX: 0,
                   layerOffsetY: 0,
                   rotation: 0,
                   rotationAtDragStart: 0,
                   dragStartAngle: 0,
-                  currentBounds: { x: bx, y: by, width: bw, height: bh },
+                  currentBounds: { x: tbx, y: tby, width: tbw, height: tbh },
                   activeHandle: null,
                   dragStartX: 0,
                   dragStartY: 0,
-                  boundsAtDragStart: { x: bx, y: by, width: bw, height: bh },
+                  boundsAtDragStart: { x: tbx, y: tby, width: tbw, height: tbh },
                 };
                 setFreeTransformState(transformState);
                 freeTransformRef.current = transformState;
