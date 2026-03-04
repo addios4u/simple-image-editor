@@ -64,7 +64,8 @@ const webviewConfig = {
           {
             loader: 'ts-loader',
             options: {
-              configFile: 'tsconfig.webview.json'
+              configFile: 'tsconfig.webview.json',
+              transpileOnly: true
             }
           }
         ]
