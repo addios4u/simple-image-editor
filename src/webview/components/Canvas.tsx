@@ -793,16 +793,23 @@ const Canvas: React.FC = () => {
                 const lby = by - offY;
                 const originalPixels = new Uint8Array(bw * bh * 4);
                 for (let row = 0; row < bh; row++) {
-                  const srcOff = ((lby + row) * cw + lbx) * 4;  // read at layer-local coords
-                  const dstOff = row * bw * 4;
-                  originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), dstOff);
+                  const ly = lby + row;
+                  if (ly < 0 || ly >= ch) continue;
+                  const colStart = Math.max(0, -lbx);           // first valid dst col
+                  const colEnd = Math.min(bw, cw - lbx);        // last valid dst col + 1
+                  if (colStart >= colEnd) continue;
+                  const srcOff = (ly * cw + Math.max(0, lbx)) * 4;
+                  const dstOff = (row * bw + colStart) * 4;
+                  originalPixels.set(extracted.subarray(srcOff, srcOff + (colEnd - colStart) * 4), dstOff);
                 }
 
                 setFloatingLayer(originalPixels, bw, bh);
                 setFloatingOffset(bx, by);  // floating offset is canvas-space for rendering
                 requestRender();
 
-                // Hide marching ants
+                // 선택 animation 제거: sharedContour, 마스크, selection 상태 모두 클리어
+                sharedContour = null;
+                getSelectionMask()?.clear();
                 setSelection(null);
 
                 const transformState: FreeTransformState = {
