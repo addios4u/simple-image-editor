@@ -84,6 +84,13 @@ const moveConfig: MoveToolConfig = {
   onContourChange: (contour) => {
     sharedContour = contour;
   },
+  // History
+  pushEditWithSnapshot: (label, layerId, before, region, maskBefore?) =>
+    useHistoryStore.getState().pushEditWithSnapshot(label, layerId, before, region, maskBefore),
+  commitSnapshot: (entryId, after, maskAfter?) =>
+    useHistoryStore.getState().commitSnapshot(entryId, after, maskAfter),
+  pushEditWithAction: (label, undoFn, redoFn) =>
+    useHistoryStore.getState().pushEditWithAction(label, undoFn, redoFn),
 };
 
 // Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.

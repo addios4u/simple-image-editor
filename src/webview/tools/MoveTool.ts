@@ -28,6 +28,15 @@ export interface MoveToolConfig {
   ) => WasmRegionSnapshot | null;
   restoreLayerRegion?: (layerId: string, snapshot: WasmRegionSnapshot) => void;
   onContourChange?: (contour: Array<Array<[number, number]>> | null) => void;
+
+  // History
+  pushEditWithSnapshot?: (
+    label: string, layerId: string, before: WasmRegionSnapshot,
+    region: { x: number; y: number; w: number; h: number },
+    maskBefore?: Uint8Array,
+  ) => string;
+  commitSnapshot?: (entryId: string, after: WasmRegionSnapshot, maskAfter?: Uint8Array) => void;
+  pushEditWithAction?: (label: string, undoFn: () => void, redoFn: () => void) => void;
 }
 
 type MoveMode = 'idle' | 'layer-move' | 'selection-move';
@@ -47,6 +56,7 @@ export class MoveTool extends BaseTool {
   private floatingPixels: Uint8Array | null = null;
   private floatingWidth = 0;
   private floatingHeight = 0;
+  private _selectionHistoryId: string | null = null;
 
   constructor(config?: MoveToolConfig) {
     super();
@@ -76,11 +86,19 @@ export class MoveTool extends BaseTool {
 
       // Save mask snapshot for translate during drag
       this.maskSnapshot = mask!.snapshot();
+      this._selectionHistoryId = null;
 
       // Capture undo snapshot
-      this.config.captureLayerRegion?.(
+      const before = this.config.captureLayerRegion?.(
         layerId, 0, 0, canvasSize.width, canvasSize.height,
-      );
+      ) ?? null;
+      if (before && this.config.pushEditWithSnapshot) {
+        this._selectionHistoryId = this.config.pushEditWithSnapshot(
+          'Move Selection', layerId, before,
+          { x: 0, y: 0, w: canvasSize.width, h: canvasSize.height },
+          this.maskSnapshot ?? undefined,
+        );
+      }
 
       // Extract masked pixels from layer (clears source)
       this.floatingPixels = this.config.extractMaskedPixels(layerId, mask!.getMaskData());
@@ -160,9 +178,35 @@ export class MoveTool extends BaseTool {
 
       this.config.requestRender();
 
+      // Commit undo snapshot
+      if (this._selectionHistoryId && this.config.commitSnapshot) {
+        const canvasSize = this.config.getCanvasSize?.() ?? { width: 0, height: 0 };
+        const after = this.config.captureLayerRegion?.(layerId, 0, 0, canvasSize.width, canvasSize.height) ?? null;
+        const maskAfter = this.config.getMask?.()?.snapshot();
+        if (after) {
+          this.config.commitSnapshot(this._selectionHistoryId, after, maskAfter);
+        }
+        this._selectionHistoryId = null;
+      }
+
       // Cleanup
       this.floatingPixels = null;
       this.maskSnapshot = null;
+    } else if (this.mode === 'layer-move' && this.config) {
+      const layerId = this.config.getActiveLayerId();
+      const finalOffset = this.config.getLayerOffset(layerId);
+      const startOffset = { ...this.baseOffset };
+      if (
+        (finalOffset.x !== startOffset.x || finalOffset.y !== startOffset.y) &&
+        this.config.pushEditWithAction
+      ) {
+        const cfg = this.config;
+        cfg.pushEditWithAction(
+          'Move Layer',
+          () => cfg.setLayerOffset(layerId, startOffset.x, startOffset.y),
+          () => cfg.setLayerOffset(layerId, finalOffset.x, finalOffset.y),
+        );
+      }
     }
 
     this.isDragging = false;
@@ -202,6 +246,7 @@ export class MoveTool extends BaseTool {
     this.maskSnapshot = null;
     this.floatingWidth = 0;
     this.floatingHeight = 0;
+    this._selectionHistoryId = null;
   }
 
   private translateMaskAndContour(dx: number, dy: number): void {
