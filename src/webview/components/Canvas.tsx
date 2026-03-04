@@ -17,7 +17,7 @@ import {
   captureLayerRegion, restoreLayerRegion,
   clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
   cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
-  addLayer, resampleBuffer,
+  addLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
 } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
@@ -232,7 +232,6 @@ const Canvas: React.FC = () => {
   const pendingOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const antsOffsetRef = useRef(0);
   const antsRafRef = useRef<number>(0);
-  const internalClipboardBlobRef = useRef<Blob | null>(null);
 
   // Setup canvas 2D context and render loop on mount
   useEffect(() => {
@@ -657,7 +656,7 @@ const Canvas: React.FC = () => {
                   x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height,
                 });
                 if (!blob) break;
-                internalClipboardBlobRef.current = blob;
+                setInternalClipboard(blob);
                 try {
                   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
                 } catch (e) {
@@ -686,7 +685,7 @@ const Canvas: React.FC = () => {
                 }
                 // 시스템 클립보드에 이미지 없으면 내부 클립보드 사용
                 if (!blobToPaste) {
-                  blobToPaste = internalClipboardBlobRef.current;
+                  blobToPaste = getInternalClipboard();
                 }
                 if (!blobToPaste) break;
                 const newLayerStore = useLayerStore.getState();

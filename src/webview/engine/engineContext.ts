@@ -39,6 +39,11 @@ let canvasHeight = 0;
 /** Maps UI layer id → WASM compositor layer index. */
 const layerIndexMap = new Map<string, number>();
 
+/** Module-level internal clipboard for copy/paste across shortcuts and context menu. */
+let internalClipboardBlob: Blob | null = null;
+export function setInternalClipboard(blob: Blob): void { internalClipboardBlob = blob; }
+export function getInternalClipboard(): Blob | null { return internalClipboardBlob; }
+
 /**
  * Safely free the current compositor, tolerating corrupted borrow state.
  * A previous WASM panic (e.g. detached ArrayBuffer) can leave the

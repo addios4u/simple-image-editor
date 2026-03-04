@@ -2,15 +2,42 @@ import { useEffect } from 'react';
 import { useEditorStore, ToolType } from '../state/editorStore';
 import { useHistoryStore } from '../state/historyStore';
 import { useLayerStore } from '../state/layerStore';
-import { fillRectLayer, requestRender, copySelection, cutSelection, pasteClipboard } from '../engine/engineContext';
+import {
+  fillRectLayer, requestRender, cutSelection,
+  copySelectionToBlob, pasteImageAsNewLayer, clearMaskedPixels,
+  setInternalClipboard, getInternalClipboard,
+} from '../engine/engineContext';
+import { getSelectionMask } from '../engine/selectionMask';
 import { hexToPackedRGBA } from '../engine/helpers';
 
 const TOOL_KEYS: Record<string, ToolType> = {
   v: 'move',
-  s: 'select',
+  m: 'select',
   b: 'brush',
   t: 'text',
 };
+
+/** Convert canvas-coordinate mask to layer-local coordinates (mirrors Canvas.tsx helper). */
+function adjustMaskForOffset(
+  canvasMask: Uint8Array,
+  canvasW: number,
+  canvasH: number,
+  offsetX: number,
+  offsetY: number,
+): Uint8Array {
+  if (offsetX === 0 && offsetY === 0) return canvasMask;
+  const layerMask = new Uint8Array(canvasW * canvasH);
+  for (let ly = 0; ly < canvasH; ly++) {
+    const cy = ly + offsetY;
+    if (cy < 0 || cy >= canvasH) continue;
+    for (let lx = 0; lx < canvasW; lx++) {
+      const cx = lx + offsetX;
+      if (cx < 0 || cx >= canvasW) continue;
+      layerMask[ly * canvasW + lx] = canvasMask[cy * canvasW + cx];
+    }
+  }
+  return layerMask;
+}
 
 export function useKeyboardShortcuts(): void {
   const setZoom = useEditorStore((s) => s.setZoom);
@@ -38,25 +65,71 @@ export function useKeyboardShortcuts(): void {
           return;
         }
 
-        // Clipboard
-        if (key === 'c' || key === 'x') {
+        // Copy
+        if (key === 'c') {
+          const mask = getSelectionMask();
+          if (!mask || mask.isEmpty()) return;
+          const bounds = mask.getBounds();
+          if (!bounds) return;
+          e.preventDefault();
+          void (async () => {
+            const blob = await copySelectionToBlob({ x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height });
+            if (!blob) return;
+            setInternalClipboard(blob);
+            try {
+              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            } catch {
+              console.warn('System clipboard not available');
+            }
+          })();
+          return;
+        }
+
+        // Cut
+        if (key === 'x') {
           const { selection } = useEditorStore.getState();
           if (!selection) return;
           const { activeLayerId } = useLayerStore.getState();
           e.preventDefault();
-          if (key === 'c') {
-            copySelection(activeLayerId, selection.x, selection.y, selection.width, selection.height);
-          } else {
-            cutSelection(activeLayerId, selection.x, selection.y, selection.width, selection.height);
-            requestRender();
-          }
+          cutSelection(activeLayerId, selection.x, selection.y, selection.width, selection.height);
+          requestRender();
           return;
         }
+
+        // Paste — creates new layer (same as context menu)
         if (key === 'v' && !e.shiftKey) {
           e.preventDefault();
-          const { activeLayerId } = useLayerStore.getState();
-          pasteClipboard(activeLayerId, 0, 0);
-          requestRender();
+          void (async () => {
+            let blobToPaste: Blob | null = null;
+            try {
+              const items = await navigator.clipboard.read();
+              for (const item of items) {
+                const imageType = item.types.find((t) => t.startsWith('image/'));
+                if (imageType) {
+                  blobToPaste = await item.getType(imageType);
+                  break;
+                }
+              }
+            } catch {
+              console.warn('System clipboard read failed');
+            }
+            if (!blobToPaste) blobToPaste = getInternalClipboard();
+            if (!blobToPaste) return;
+
+            const layerStore = useLayerStore.getState();
+            layerStore.addLayer();
+            const newLayers = useLayerStore.getState().layers;
+            const newLayer = newLayers[newLayers.length - 1];
+            if (!newLayer) return;
+            const ok = await pasteImageAsNewLayer(blobToPaste, newLayer.id);
+            if (ok) {
+              useLayerStore.getState().setActiveLayer(newLayer.id);
+              useLayerStore.getState().bumpThumbnailVersion();
+              requestRender();
+            } else {
+              useLayerStore.getState().removeLayer(newLayer.id);
+            }
+          })();
           return;
         }
 
@@ -88,8 +161,26 @@ export function useKeyboardShortcuts(): void {
         return;
       }
 
+      // --- Delete / Backspace: Clear selection ---
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const mask = getSelectionMask();
+        if (!mask || mask.isEmpty()) return;
+        const { activeLayerId } = useLayerStore.getState();
+        const { canvasWidth, canvasHeight } = useEditorStore.getState();
+        const layer = useLayerStore.getState().layers.find((l) => l.id === activeLayerId);
+        const offX = layer?.offsetX ?? 0;
+        const offY = layer?.offsetY ?? 0;
+        const maskData = mask.getMaskData();
+        const adjMask = adjustMaskForOffset(maskData, canvasWidth, canvasHeight, offX, offY);
+        e.preventDefault();
+        clearMaskedPixels(activeLayerId, adjMask);
+        useLayerStore.getState().bumpThumbnailVersion();
+        requestRender();
+        return;
+      }
+
       // --- Single-key tool shortcuts (no modifier) ---
-      if (key === 's') {
+      if (key === 'm') {
         e.preventDefault();
         const store = useEditorStore.getState();
         if (store.activeTool === 'select') {
