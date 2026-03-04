@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { Minus, Plus, MousePointer2, BoxSelect, Circle, PenLine, Type, Download } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { Minus, Plus, MousePointer2, BoxSelect, Circle, PenLine, Type, Download, SlidersHorizontal } from 'lucide-react';
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import { useLayerStore } from '../state/layerStore';
 import ModeSegment from './ModeSegment';
 import TextOptionsBar from './TextOptionsBar';
+import FilterMenu from './FilterMenu';
 import { compositeToBytes } from '../engine/engineContext';
 
 function hexToRgb(hex: string): string {
@@ -44,6 +45,8 @@ const Toolbar: React.FC = () => {
   const showTextOptions = activeTool === 'text' || activeLayerIsText;
 
   const [copied, setCopied] = useState('');
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const filterBtnRef = useRef<HTMLDivElement>(null);
 
   const zoomIn = () => setZoom(Math.min(zoom * 1.25, 32));
   const zoomOut = () => setZoom(Math.max(zoom / 1.25, 0.01));
@@ -136,6 +139,23 @@ const Toolbar: React.FC = () => {
         </button>
       ))}
       {showTextOptions && <TextOptionsBar />}
+
+      {/* 필터 버튼 */}
+      <div className="toolbar-separator" />
+      <div ref={filterBtnRef} style={{ position: 'relative' }}>
+        <button
+          className={`toolbar-btn${filterMenuOpen ? ' active' : ''}`}
+          onClick={() => setFilterMenuOpen((v) => !v)}
+          title="필터"
+          data-testid="filter-toolbar-btn"
+        >
+          <SlidersHorizontal size={18} />
+        </button>
+        {filterMenuOpen && (
+          <FilterMenu onClose={() => setFilterMenuOpen(false)} />
+        )}
+      </div>
+
       <button
         className="toolbar-btn"
         onClick={handleExport}

@@ -644,6 +644,65 @@ export function motionBlurLayer(
   compositor.motion_blur_layer(idx, angle, distance);
 }
 
+export function gaussianBlurLayerRegion(
+  layerId: string, sigma: number,
+  x: number, y: number, w: number, h: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.gaussian_blur_layer_region(idx, sigma, x, y, w, h);
+}
+
+export function motionBlurLayerRegion(
+  layerId: string, angle: number, distance: number,
+  x: number, y: number, w: number, h: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.motion_blur_layer_region(idx, angle, distance, x, y, w, h);
+}
+
+/**
+ * Apply a filter to a thumbnail-sized copy of pixel data for preview purposes.
+ * Returns filtered ImageData, or null if WASM is not ready.
+ */
+export function applyFilterPreview(
+  srcData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  filterType: 'gaussian' | 'motion',
+  params: { sigma?: number; angle?: number; distance?: number },
+): ImageData | null {
+  if (!wasmMemory) return null;
+  let mod: ReturnType<typeof import('./wasmBridge').getModule>;
+  try {
+    mod = getModule();
+  } catch {
+    return null;
+  }
+
+  const buf = new mod.PixelBuffer(width, height);
+  // Write source pixels into WASM buffer
+  const ptr = buf.data_ptr();
+  const len = buf.data_len();
+  new Uint8Array(wasmMemory.buffer, ptr, len).set(new Uint8Array(srcData.buffer));
+
+  // Apply filter (may grow WASM memory, so re-read ptr/len after)
+  if (filterType === 'gaussian' && params.sigma !== undefined) {
+    mod.gaussian_blur(buf, params.sigma);
+  } else if (filterType === 'motion' && params.angle !== undefined && params.distance !== undefined) {
+    mod.motion_blur(buf, params.angle, params.distance);
+  }
+
+  // Copy result before freeing (use fresh wasmMemory.buffer view)
+  const resultData = new Uint8ClampedArray(
+    new Uint8Array(new Uint8Array(wasmMemory.buffer, buf.data_ptr(), buf.data_len())),
+  );
+  buf.free();
+
+  return new ImageData(resultData, width, height);
+}
+
 // ---------------------------------------------------------------------------
 // History (capture / restore)
 // ---------------------------------------------------------------------------

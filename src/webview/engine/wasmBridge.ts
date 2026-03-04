@@ -104,6 +104,8 @@ export interface WasmLayerCompositor {
   box_blur_layer(index: number, radius: number): void;
   gaussian_blur_layer(index: number, sigma: number): void;
   motion_blur_layer(index: number, angle: number, distance: number): void;
+  gaussian_blur_layer_region(index: number, sigma: number, x: number, y: number, w: number, h: number): void;
+  motion_blur_layer_region(index: number, angle: number, distance: number, x: number, y: number, w: number, h: number): void;
   capture_layer_region(
     index: number, x: number, y: number, w: number, h: number,
   ): WasmRegionSnapshot;

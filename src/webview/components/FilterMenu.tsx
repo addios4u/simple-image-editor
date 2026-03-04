@@ -1,201 +1,89 @@
-import React, { useState, useCallback } from 'react';
-import {
-  gaussianBlurLayer,
-  boxBlurLayer,
-  motionBlurLayer,
-  captureLayerRegion,
-  requestRender,
-} from '../engine/engineContext';
-import { useHistoryStore } from '../state/historyStore';
-import { useLayerStore } from '../state/layerStore';
-import { useEditorStore } from '../state/editorStore';
+import React, { useEffect, useRef } from 'react';
+import FilterDialog, { type FilterType } from './FilterDialog';
 
-type FilterType = 'gaussian' | 'box' | 'motion' | null;
-
-interface FilterParams {
-  sigma: string;
-  radius: string;
-  angle: string;
-  distance: string;
+interface FilterMenuProps {
+  onClose: () => void;
 }
 
-const FilterMenu: React.FC = () => {
-  const [activeFilter, setActiveFilter] = useState<FilterType>(null);
-  const [params, setParams] = useState<FilterParams>({
-    sigma: '1.0',
-    radius: '3',
-    angle: '0',
-    distance: '5',
-  });
+const FILTERS: { type: FilterType; label: string; description: string }[] = [
+  { type: 'gaussian', label: '가우시안 블러', description: '부드러운 흐림 효과' },
+  { type: 'motion', label: '모션 블러', description: '방향성 흐림 효과' },
+];
 
-  const handleApply = useCallback(() => {
-    if (!activeFilter) return;
+const FilterMenu: React.FC<FilterMenuProps> = ({ onClose }) => {
+  const [activeFilter, setActiveFilter] = React.useState<FilterType | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-    const { activeLayerId } = useLayerStore.getState();
-    const { canvasWidth: cw, canvasHeight: ch } = useEditorStore.getState();
-    const region = { x: 0, y: 0, w: cw, h: ch };
-
-    // Capture before snapshot for undo
-    const beforeSnapshot = captureLayerRegion(activeLayerId, 0, 0, cw, ch);
-
-    // Apply the filter
-    let label = '';
-    switch (activeFilter) {
-      case 'gaussian':
-        gaussianBlurLayer(activeLayerId, parseFloat(params.sigma));
-        label = 'Gaussian Blur';
-        break;
-      case 'box':
-        boxBlurLayer(activeLayerId, parseInt(params.radius, 10));
-        label = 'Box Blur';
-        break;
-      case 'motion':
-        motionBlurLayer(activeLayerId, parseInt(params.angle, 10), parseInt(params.distance, 10));
-        label = 'Motion Blur';
-        break;
-    }
-
-    // Capture after snapshot and record in history
-    if (beforeSnapshot) {
-      const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
-      const entryId = pushEditWithSnapshot(label, activeLayerId, beforeSnapshot, region);
-      const afterSnapshot = captureLayerRegion(activeLayerId, 0, 0, cw, ch);
-      if (afterSnapshot) {
-        commitSnapshot(entryId, afterSnapshot);
+  // 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
       }
-    }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
 
-    requestRender();
-    setActiveFilter(null);
-  }, [activeFilter, params]);
-
-  const handleCancel = () => {
-    setActiveFilter(null);
-  };
-
-  const handleParamChange = (key: keyof FilterParams, value: string) => {
-    setParams((prev) => ({ ...prev, [key]: value }));
-  };
+  if (activeFilter) {
+    return (
+      <FilterDialog
+        filterType={activeFilter}
+        onClose={() => {
+          setActiveFilter(null);
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
-    <div className="filter-menu" data-testid="filter-menu">
-      <h3>Filters</h3>
-      <div className="filter-list">
+    <div ref={menuRef} style={menuStyle} data-testid="filter-menu">
+      {FILTERS.map((f) => (
         <button
-          className="filter-btn"
-          onClick={() => setActiveFilter('gaussian')}
+          key={f.type}
+          style={menuItemStyle}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#3a3a3a')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          onClick={() => setActiveFilter(f.type)}
+          data-testid={`filter-btn-${f.type}`}
         >
-          Gaussian Blur
+          <span style={{ fontWeight: 500, color: '#eee' }}>{f.label}</span>
+          <span style={{ fontSize: 10, color: '#888', marginTop: 1 }}>{f.description}</span>
         </button>
-        <button
-          className="filter-btn"
-          onClick={() => setActiveFilter('box')}
-        >
-          Box Blur
-        </button>
-        <button
-          className="filter-btn"
-          onClick={() => setActiveFilter('motion')}
-        >
-          Motion Blur
-        </button>
-      </div>
-
-      {activeFilter === 'gaussian' && (
-        <div className="filter-dialog" data-testid="filter-dialog">
-          <h4>Gaussian Blur Settings</h4>
-          <label>
-            Sigma
-            <input
-              type="range"
-              min="0.1"
-              max="20"
-              step="0.1"
-              value={params.sigma}
-              onChange={(e) => handleParamChange('sigma', e.target.value)}
-              aria-label="Sigma"
-            />
-            <span>{params.sigma}</span>
-          </label>
-          <div className="filter-actions">
-            <button className="filter-apply-btn" onClick={handleApply}>
-              Apply
-            </button>
-            <button className="filter-cancel-btn" onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {activeFilter === 'box' && (
-        <div className="filter-dialog" data-testid="filter-dialog">
-          <h4>Box Blur Settings</h4>
-          <label>
-            Radius
-            <input
-              type="range"
-              min="1"
-              max="50"
-              step="1"
-              value={params.radius}
-              onChange={(e) => handleParamChange('radius', e.target.value)}
-              aria-label="Radius"
-            />
-            <span>{params.radius}</span>
-          </label>
-          <div className="filter-actions">
-            <button className="filter-apply-btn" onClick={handleApply}>
-              Apply
-            </button>
-            <button className="filter-cancel-btn" onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {activeFilter === 'motion' && (
-        <div className="filter-dialog" data-testid="filter-dialog">
-          <h4>Motion Blur Settings</h4>
-          <label>
-            Angle
-            <input
-              type="range"
-              min="0"
-              max="360"
-              step="1"
-              value={params.angle}
-              onChange={(e) => handleParamChange('angle', e.target.value)}
-              aria-label="Angle"
-            />
-            <span>{params.angle}</span>
-          </label>
-          <label>
-            Distance
-            <input
-              type="range"
-              min="1"
-              max="50"
-              step="1"
-              value={params.distance}
-              onChange={(e) => handleParamChange('distance', e.target.value)}
-              aria-label="Distance"
-            />
-            <span>{params.distance}</span>
-          </label>
-          <div className="filter-actions">
-            <button className="filter-apply-btn" onClick={handleApply}>
-              Apply
-            </button>
-            <button className="filter-cancel-btn" onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
+};
+
+const menuStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  background: '#2d2d2d',
+  border: '1px solid #555',
+  borderRadius: 4,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+  zIndex: 9000,
+  minWidth: 160,
+  padding: '4px 0',
+};
+
+const menuItemStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  width: '100%',
+  padding: '7px 14px',
+  background: 'transparent',
+  border: 'none',
+  color: '#ccc',
+  fontSize: 12,
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  textAlign: 'left',
+  gap: 2,
+  transition: 'background 0.1s',
 };
 
 export default FilterMenu;
