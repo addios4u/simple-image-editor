@@ -20,6 +20,8 @@ export interface BrushToolConfig {
   captureLayerRegion?: (layerId: string, x: number, y: number, w: number, h: number) => WasmRegionSnapshot | null;
   pushEditWithSnapshot?: (label: string, layerId: string, before: WasmRegionSnapshot, region: { x: number; y: number; w: number; h: number }) => string;
   commitSnapshot?: (entryId: string, after: WasmRegionSnapshot) => void;
+  /** Bakes layer offset into pixels if non-zero, resetting offset to (0,0). */
+  bakeOffsetIfNeeded?: (layerId: string) => void;
 }
 
 export class BrushTool extends BaseTool {
@@ -51,6 +53,8 @@ export class BrushTool extends BaseTool {
 
     if (this.config && !this.config.isLayerLocked()) {
       const layerId = this.config.getActiveLayerId();
+      // Bake offset into pixels so brush can draw at full canvas coverage
+      this.config.bakeOffsetIfNeeded?.(layerId);
       const size = this.config.getCanvasSize?.() ?? { width: 0, height: 0 };
       const before = this.config.captureLayerRegion?.(layerId, 0, 0, size.width, size.height) ?? null;
       if (before && this.config.pushEditWithSnapshot) {

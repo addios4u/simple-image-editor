@@ -5,7 +5,7 @@ import { useLayerStore } from '../state/layerStore';
 import {
   fillRectLayer, requestRender, cutSelection,
   copySelectionToBlob, pasteImageAsNewLayer, clearMaskedPixels,
-  setInternalClipboard, getInternalClipboard,
+  setInternalClipboard, getInternalClipboard, removeLayer as engineRemoveLayer,
 } from '../engine/engineContext';
 import { getSelectionMask } from '../engine/selectionMask';
 import { hexToPackedRGBA } from '../engine/helpers';
@@ -125,8 +125,33 @@ export function useKeyboardShortcuts(): void {
             if (ok) {
               useLayerStore.getState().setActiveLayer(newLayer.id);
               useLayerStore.getState().bumpThumbnailVersion();
-              useHistoryStore.getState().pushEdit('Paste');
               requestRender();
+              const pastedLayerId = newLayer.id;
+              const savedBlob = blobToPaste;
+              useHistoryStore.getState().pushEditWithAction(
+                'Paste',
+                () => {
+                  engineRemoveLayer(pastedLayerId);
+                  useLayerStore.getState().removeLayer(pastedLayerId);
+                  requestRender();
+                },
+                () => {
+                  void (async () => {
+                    useLayerStore.getState().addLayer();
+                    const redoLayers = useLayerStore.getState().layers;
+                    const redoLayer = redoLayers[redoLayers.length - 1];
+                    if (!redoLayer) return;
+                    const redoOk = await pasteImageAsNewLayer(savedBlob, redoLayer.id);
+                    if (redoOk) {
+                      useLayerStore.getState().setActiveLayer(redoLayer.id);
+                      useLayerStore.getState().bumpThumbnailVersion();
+                      requestRender();
+                    } else {
+                      useLayerStore.getState().removeLayer(redoLayer.id);
+                    }
+                  })();
+                },
+              );
             } else {
               useLayerStore.getState().removeLayer(newLayer.id);
             }

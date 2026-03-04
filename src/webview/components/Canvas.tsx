@@ -17,7 +17,7 @@ import {
   captureLayerRegion, restoreLayerRegion,
   clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
   cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
-  addLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
+  addLayer, removeLayer as engineRemoveLayer, resampleBuffer, setInternalClipboard, getInternalClipboard,
   renderTextToLayer, bakeLayerOffset,
 } from '../engine/engineContext';
 import TextInputDialog from './TextInputDialog';
@@ -50,6 +50,12 @@ const brushConfig: BrushToolConfig = {
     useHistoryStore.getState().pushEditWithSnapshot(label, layerId, before, region),
   commitSnapshot: (entryId, after) =>
     useHistoryStore.getState().commitSnapshot(entryId, after),
+  bakeOffsetIfNeeded: (layerId) => {
+    const layer = useLayerStore.getState().layers.find((l) => l.id === layerId);
+    if (!layer || (layer.offsetX === 0 && layer.offsetY === 0)) return;
+    bakeLayerOffset(layerId);
+    useLayerStore.getState().setLayerOffset(layerId, 0, 0);
+  },
 };
 
 const moveConfig: MoveToolConfig = {
@@ -1039,8 +1045,33 @@ const Canvas: React.FC = () => {
                 if (ok) {
                   useLayerStore.getState().setActiveLayer(newLayer.id);
                   useLayerStore.getState().bumpThumbnailVersion();
-                  useHistoryStore.getState().pushEdit('Paste');
                   requestRender();
+                  const pastedLayerId = newLayer.id;
+                  const savedBlob = blobToPaste;
+                  useHistoryStore.getState().pushEditWithAction(
+                    'Paste',
+                    () => {
+                      engineRemoveLayer(pastedLayerId);
+                      useLayerStore.getState().removeLayer(pastedLayerId);
+                      requestRender();
+                    },
+                    () => {
+                      void (async () => {
+                        useLayerStore.getState().addLayer();
+                        const redoLayers = useLayerStore.getState().layers;
+                        const redoLayer = redoLayers[redoLayers.length - 1];
+                        if (!redoLayer) return;
+                        const redoOk = await pasteImageAsNewLayer(savedBlob, redoLayer.id);
+                        if (redoOk) {
+                          useLayerStore.getState().setActiveLayer(redoLayer.id);
+                          useLayerStore.getState().bumpThumbnailVersion();
+                          requestRender();
+                        } else {
+                          useLayerStore.getState().removeLayer(redoLayer.id);
+                        }
+                      })();
+                    },
+                  );
                 } else {
                   useLayerStore.getState().removeLayer(newLayer.id);
                 }
