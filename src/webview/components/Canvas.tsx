@@ -79,6 +79,8 @@ const moveConfig: MoveToolConfig = {
 
 // Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.
 let sharedContour: Array<Array<[number, number]>> | null = null;
+// Source canvas for free transform overlay rendering (originalPixels pre-rendered).
+let sharedFloatingSrcCanvas: HTMLCanvasElement | null = null;
 
 // Module-level opener — set by Canvas component on mount.
 let _openTextEditor: ((x: number, y: number, layerId: string | null, existing?: TextData) => void) | null = null;
@@ -172,7 +174,7 @@ function toToolEvent(
   };
 }
 
-type HandleId = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' | 'move';
+type HandleId = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' | 'move' | 'rotate';
 
 interface FreeTransformState {
   layerId: string;
@@ -184,6 +186,9 @@ interface FreeTransformState {
   layerOffsetX: number;  // layer offset at init time (for canvas↔layer-local conversion)
   layerOffsetY: number;
   currentBounds: { x: number; y: number; width: number; height: number };  // canvas coords
+  rotation: number;  // degrees
+  rotationAtDragStart: number;
+  dragStartAngle: number;
   activeHandle: HandleId | null;
   dragStartX: number;
   dragStartY: number;
@@ -194,10 +199,28 @@ function getHitHandle(
   x: number,
   y: number,
   bounds: { x: number; y: number; width: number; height: number },
+  rotation: number,
   zoom: number,
 ): HandleId | null {
   const HANDLE_RADIUS = 6 / zoom;
   const { x: bx, y: by, width: bw, height: bh } = bounds;
+  const cx = bx + bw / 2;
+  const cy = by + bh / 2;
+
+  // Transform mouse to local (unrotated) frame
+  const θ = -rotation * Math.PI / 180;
+  const dx = x - cx;
+  const dy = y - cy;
+  const lx = cx + dx * Math.cos(θ) - dy * Math.sin(θ);
+  const ly = cy + dx * Math.sin(θ) + dy * Math.cos(θ);
+
+  // Rotation handle: above center-top in local frame
+  const ROTATE_DIST = 20 / zoom;
+  const rhx = cx;
+  const rhy = by - ROTATE_DIST;
+  if (Math.hypot(lx - rhx, ly - rhy) <= HANDLE_RADIUS * 1.5) return 'rotate';
+
+  // Scale handles (in local frame)
   const handles: Array<{ id: HandleId; hx: number; hy: number }> = [
     { id: 'tl', hx: bx,          hy: by },
     { id: 't',  hx: bx + bw / 2, hy: by },
@@ -209,11 +232,12 @@ function getHitHandle(
     { id: 'l',  hx: bx,          hy: by + bh / 2 },
   ];
   for (const h of handles) {
-    if (Math.abs(x - h.hx) <= HANDLE_RADIUS && Math.abs(y - h.hy) <= HANDLE_RADIUS) {
+    if (Math.abs(lx - h.hx) <= HANDLE_RADIUS && Math.abs(ly - h.hy) <= HANDLE_RADIUS) {
       return h.id;
     }
   }
-  if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) return 'move';
+  // Inside box = move (check in local frame)
+  if (lx >= bx && lx <= bx + bw && ly >= by && ly <= by + bh) return 'move';
   return null;
 }
 
@@ -350,35 +374,68 @@ const Canvas: React.FC = () => {
           ctx.restore();
         }
 
-        // Free Transform handles
+        // Free Transform: floating layer + handles (overlay-based with rotation)
         const tf = freeTransformRef.current;
+        const floatSrc = sharedFloatingSrcCanvas;
         if (tf) {
-          const { x, y, width: bw, height: bh } = tf.currentBounds;
+          const { currentBounds: cb, rotation } = tf;
+          const { x, y, width: bw, height: bh } = cb;
+          const cx = x + bw / 2;
+          const cy = y + bh / 2;
+          const θ = rotation * Math.PI / 180;
+
           ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(θ);
+
+          // Draw floating layer pixels
+          if (floatSrc) {
+            ctx.drawImage(floatSrc, -bw / 2, -bh / 2, bw, bh);
+          }
+
+          // Rotated transform box
           ctx.strokeStyle = '#0088ff';
           ctx.lineWidth = 1 / zoom;
           ctx.setLineDash([5 / zoom, 3 / zoom]);
-          ctx.strokeRect(x, y, bw, bh);
+          ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
           ctx.setLineDash([]);
 
-          const handles = [
-            { hx: x,         hy: y },
-            { hx: x + bw / 2, hy: y },
-            { hx: x + bw,    hy: y },
-            { hx: x + bw,    hy: y + bh / 2 },
-            { hx: x + bw,    hy: y + bh },
-            { hx: x + bw / 2, hy: y + bh },
-            { hx: x,         hy: y + bh },
-            { hx: x,         hy: y + bh / 2 },
-          ];
+          // Scale handles (in local/rotated frame)
           const hs = 4 / zoom;
-          for (const h of handles) {
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#0088ff';
-            ctx.lineWidth = 1 / zoom;
+          const scaleHandles = [
+            { hx: -bw / 2, hy: -bh / 2 },
+            { hx: 0,       hy: -bh / 2 },
+            { hx:  bw / 2, hy: -bh / 2 },
+            { hx:  bw / 2, hy: 0 },
+            { hx:  bw / 2, hy:  bh / 2 },
+            { hx: 0,       hy:  bh / 2 },
+            { hx: -bw / 2, hy:  bh / 2 },
+            { hx: -bw / 2, hy: 0 },
+          ];
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#0088ff';
+          ctx.lineWidth = 1 / zoom;
+          for (const h of scaleHandles) {
             ctx.fillRect(h.hx - hs, h.hy - hs, hs * 2, hs * 2);
             ctx.strokeRect(h.hx - hs, h.hy - hs, hs * 2, hs * 2);
           }
+
+          // Rotation handle (circle above center-top)
+          const ROTATE_DIST = 20 / zoom;
+          const rhy = -bh / 2 - ROTATE_DIST;
+          ctx.strokeStyle = '#0088ff';
+          ctx.lineWidth = 1 / zoom;
+          ctx.beginPath();
+          ctx.moveTo(0, -bh / 2);
+          ctx.lineTo(0, rhy);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(0, rhy, hs * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.strokeStyle = '#0088ff';
+          ctx.stroke();
+
           ctx.restore();
         }
       }
@@ -405,19 +462,35 @@ const Canvas: React.FC = () => {
         // Free transform active — Enter commits, Escape cancels
         if (e.key === 'Enter' && !isMod) {
           e.preventDefault();
-          const { currentBounds, originalPixels, originalW, originalH, layerId, layerOffsetX, layerOffsetY } = tf;
-          const resampled = resampleBuffer(
-            originalPixels, originalW, originalH,
-            currentBounds.width, currentBounds.height,
+          const { currentBounds, originalPixels, originalW, originalH, layerId, rotation } = tf;
+          // Rasterize with scale + rotation using canvas 2D
+          const θ = rotation * Math.PI / 180;
+          const cos = Math.abs(Math.cos(θ));
+          const sin = Math.abs(Math.sin(θ));
+          const sw = currentBounds.width;
+          const sh = currentBounds.height;
+          const aabbW = Math.max(1, Math.round(sw * cos + sh * sin));
+          const aabbH = Math.max(1, Math.round(sw * sin + sh * cos));
+          const cx = currentBounds.x + sw / 2;
+          const cy = currentBounds.y + sh / 2;
+          const aabbX = Math.round(cx - aabbW / 2);
+          const aabbY = Math.round(cy - aabbH / 2);
+
+          const srcCvs = document.createElement('canvas');
+          srcCvs.width = originalW; srcCvs.height = originalH;
+          srcCvs.getContext('2d')!.putImageData(
+            new ImageData(new Uint8ClampedArray(originalPixels), originalW, originalH), 0, 0,
           );
-          if (resampled) {
-            stampBufferOntoLayer(
-              layerId, resampled,
-              currentBounds.width, currentBounds.height,
-              currentBounds.x - layerOffsetX, currentBounds.y - layerOffsetY,
-            );
-          }
-          clearFloatingLayer();
+          const dstCvs = document.createElement('canvas');
+          dstCvs.width = aabbW; dstCvs.height = aabbH;
+          const dstCtx = dstCvs.getContext('2d')!;
+          dstCtx.translate(aabbW / 2, aabbH / 2);
+          dstCtx.rotate(θ);
+          dstCtx.drawImage(srcCvs, -sw / 2, -sh / 2, sw, sh);
+          const rasterized = new Uint8Array(dstCtx.getImageData(0, 0, aabbW, aabbH).data.buffer);
+          stampBufferOntoLayer(layerId, rasterized, aabbW, aabbH, aabbX, aabbY);
+
+          sharedFloatingSrcCanvas = null;
           setFreeTransformState(null);
           freeTransformRef.current = null;
           useEditorStore.getState().setSelection(null);
@@ -426,7 +499,7 @@ const Canvas: React.FC = () => {
           e.preventDefault();
           const { originalPixels, originalW, originalH, layerId, originalX, originalY } = tf;
           stampBufferOntoLayer(layerId, originalPixels, originalW, originalH, originalX, originalY);
-          clearFloatingLayer();
+          sharedFloatingSrcCanvas = null;
           setFreeTransformState(null);
           freeTransformRef.current = null;
           requestRender();
@@ -436,36 +509,53 @@ const Canvas: React.FC = () => {
 
       if (!isMod) return;
 
-      // Cmd+T: initiate Free Transform
+      // Cmd+T: initiate Free Transform (works with or without selection)
       if (e.key.toLowerCase() === 't') {
         e.preventDefault();
         const { selection, canvasWidth: cw, canvasHeight: ch, setSelection } = useEditorStore.getState();
         const { activeLayerId } = useLayerStore.getState();
-        const selMask = getSelectionMask();
-        if (!selMask || !selection || !activeLayerId) return;
-        const maskData = selMask.getMaskData();
-        const bounds = selMask.getBounds();
-        if (!bounds) return;
+        if (!activeLayerId) return;
 
         bakeLayerOffset(activeLayerId);
         useLayerStore.getState().setLayerOffset(activeLayerId, 0, 0);
 
-        const extracted = extractMaskedPixels(activeLayerId, maskData);
-        if (!extracted) return;
+        let bx: number, by: number, bw: number, bh: number;
+        let extracted: Uint8Array | null;
 
-        const { x: bx, y: by, width: bw, height: bh } = bounds;
+        if (selection) {
+          const selMask = getSelectionMask();
+          if (!selMask) return;
+          const maskData = selMask.getMaskData();
+          const bounds = selMask.getBounds();
+          if (!bounds) return;
+          extracted = extractMaskedPixels(activeLayerId, maskData);
+          if (!extracted) return;
+          ({ x: bx, y: by, width: bw, height: bh } = bounds);
+          sharedContour = null;
+          getSelectionMask()?.clear();
+          setSelection(null);
+        } else {
+          // No selection: free transform the entire layer
+          const fullMask = new Uint8Array(cw * ch).fill(1);
+          extracted = extractMaskedPixels(activeLayerId, fullMask);
+          if (!extracted) return;
+          bx = 0; by = 0; bw = cw; bh = ch;
+        }
+
         const originalPixels = new Uint8Array(bw * bh * 4);
         for (let row = 0; row < bh; row++) {
           const srcOff = ((by + row) * cw + bx) * 4;
           originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
         }
 
-        setFloatingLayer(originalPixels, bw, bh);
-        setFloatingOffset(bx, by);
+        // Build source canvas for overlay rendering
+        const srcCvs = document.createElement('canvas');
+        srcCvs.width = bw; srcCvs.height = bh;
+        srcCvs.getContext('2d')!.putImageData(
+          new ImageData(new Uint8ClampedArray(originalPixels), bw, bh), 0, 0,
+        );
+        sharedFloatingSrcCanvas = srcCvs;
         requestRender();
-        sharedContour = null;
-        getSelectionMask()?.clear();
-        setSelection(null);
 
         const transformState: FreeTransformState = {
           layerId: activeLayerId,
@@ -476,6 +566,9 @@ const Canvas: React.FC = () => {
           originalY: by,
           layerOffsetX: 0,
           layerOffsetY: 0,
+          rotation: 0,
+          rotationAtDragStart: 0,
+          dragStartAngle: 0,
           currentBounds: { x: bx, y: by, width: bw, height: bh },
           activeHandle: null,
           dragStartX: 0,
@@ -558,8 +651,12 @@ const Canvas: React.FC = () => {
 
       const tf = freeTransformRef.current;
       if (tf) {
-        const hit = getHitHandle(evt.x, evt.y, tf.currentBounds, zoom);
+        const hit = getHitHandle(evt.x, evt.y, tf.currentBounds, tf.rotation, zoom);
         if (hit) {
+          const { currentBounds: cb } = tf;
+          const startAngle = hit === 'rotate'
+            ? Math.atan2(evt.y - (cb.y + cb.height / 2), evt.x - (cb.x + cb.width / 2)) * 180 / Math.PI
+            : 0;
           setFreeTransformState((prev) => {
             if (!prev) return prev;
             const next: FreeTransformState = {
@@ -568,6 +665,8 @@ const Canvas: React.FC = () => {
               dragStartX: evt.x,
               dragStartY: evt.y,
               boundsAtDragStart: { ...prev.currentBounds },
+              dragStartAngle: startAngle,
+              rotationAtDragStart: prev.rotation,
             };
             freeTransformRef.current = next;
             return next;
@@ -588,25 +687,56 @@ const Canvas: React.FC = () => {
 
       const tf = freeTransformRef.current;
       if (tf && tf.activeHandle) {
+        // Rotation handle drag
+        if (tf.activeHandle === 'rotate') {
+          const { currentBounds: cb, rotationAtDragStart, dragStartAngle } = tf;
+          const cx = cb.x + cb.width / 2;
+          const cy = cb.y + cb.height / 2;
+          const currentAngle = Math.atan2(evt.y - cy, evt.x - cx) * 180 / Math.PI;
+          const newRotation = rotationAtDragStart + (currentAngle - dragStartAngle);
+          setFreeTransformState((prev) => {
+            if (!prev) return prev;
+            const next: FreeTransformState = { ...prev, rotation: newRotation };
+            freeTransformRef.current = next;
+            return next;
+          });
+          return;
+        }
+
         const dx = evt.x - tf.dragStartX;
         const dy = evt.y - tf.dragStartY;
         const { x: bx, y: by, width: bw, height: bh } = tf.boundsAtDragStart;
-        let nx = bx, ny = by, nw = bw, nh = bh;
+        const cx0 = bx + bw / 2;
+        const cy0 = by + bh / 2;
 
+        // Transform delta to local (unrotated) frame for scale handles
+        const θ = tf.rotation * Math.PI / 180;
+        const cosA = Math.cos(-θ);
+        const sinA = Math.sin(-θ);
+        const ldx = tf.activeHandle === 'move' ? dx : dx * cosA - dy * sinA;
+        const ldy = tf.activeHandle === 'move' ? dy : dx * sinA + dy * cosA;
+
+        let nx = bx, ny = by, nw = bw, nh = bh;
         switch (tf.activeHandle) {
-          case 'move': nx = bx + dx; ny = by + dy; break;
-          case 'tl':   nx = bx + dx; ny = by + dy; nw = bw - dx; nh = bh - dy; break;
-          case 't':    ny = by + dy; nh = bh - dy; break;
-          case 'tr':   ny = by + dy; nw = bw + dx; nh = bh - dy; break;
-          case 'r':    nw = bw + dx; break;
-          case 'br':   nw = bw + dx; nh = bh + dy; break;
-          case 'b':    nh = bh + dy; break;
-          case 'bl':   nx = bx + dx; nw = bw - dx; nh = bh + dy; break;
-          case 'l':    nx = bx + dx; nw = bw - dx; break;
+          case 'move': nx = bx + ldx; ny = by + ldy; break;
+          case 'tl':   nw = bw - ldx; nh = bh - ldy; break;
+          case 't':    nh = bh - ldy; break;
+          case 'tr':   nw = bw + ldx; nh = bh - ldy; break;
+          case 'r':    nw = bw + ldx; break;
+          case 'br':   nw = bw + ldx; nh = bh + ldy; break;
+          case 'b':    nh = bh + ldy; break;
+          case 'bl':   nw = bw - ldx; nh = bh + ldy; break;
+          case 'l':    nw = bw - ldx; break;
         }
 
-        if (nw < 4) { if (tf.activeHandle.includes('l')) nx = bx + bw - 4; nw = 4; }
-        if (nh < 4) { if (tf.activeHandle.includes('t')) ny = by + bh - 4; nh = 4; }
+        if (nw < 4) nw = 4;
+        if (nh < 4) nh = 4;
+
+        // Keep center fixed for scale handles
+        if (tf.activeHandle !== 'move') {
+          nx = cx0 - nw / 2;
+          ny = cy0 - nh / 2;
+        }
 
         const newBounds = {
           x: Math.round(nx),
@@ -614,18 +744,6 @@ const Canvas: React.FC = () => {
           width: Math.round(nw),
           height: Math.round(nh),
         };
-
-        if (newBounds.width > 0 && newBounds.height > 0) {
-          const resampled = resampleBuffer(
-            tf.originalPixels, tf.originalW, tf.originalH,
-            newBounds.width, newBounds.height,
-          );
-          if (resampled) {
-            setFloatingLayer(resampled, newBounds.width, newBounds.height);
-            setFloatingOffset(newBounds.x, newBounds.y);
-            requestRender();
-          }
-        }
 
         setFreeTransformState((prev) => {
           if (!prev) return prev;
@@ -941,7 +1059,6 @@ const Canvas: React.FC = () => {
                 if (!bounds) break;
 
                 // Bake layer offset: shift pixels into canvas-space coords and reset offset to (0,0).
-                // After baking, canvas coords == layer-local coords — no offset math needed.
                 bakeLayerOffset(activeLayerId);
                 useLayerStore.getState().setLayerOffset(activeLayerId, 0, 0);
 
@@ -956,8 +1073,13 @@ const Canvas: React.FC = () => {
                   originalPixels.set(extracted.subarray(srcOff, srcOff + bw * 4), row * bw * 4);
                 }
 
-                setFloatingLayer(originalPixels, bw, bh);
-                setFloatingOffset(bx, by);
+                // Build source canvas for overlay rendering (no WASM floating layer)
+                const srcCvs = document.createElement('canvas');
+                srcCvs.width = bw; srcCvs.height = bh;
+                srcCvs.getContext('2d')!.putImageData(
+                  new ImageData(new Uint8ClampedArray(originalPixels), bw, bh), 0, 0,
+                );
+                sharedFloatingSrcCanvas = srcCvs;
                 requestRender();
 
                 // 선택 animation 제거
@@ -970,10 +1092,13 @@ const Canvas: React.FC = () => {
                   originalPixels,
                   originalW: bw,
                   originalH: bh,
-                  originalX: bx,  // canvas == layer-local after bake
+                  originalX: bx,
                   originalY: by,
                   layerOffsetX: 0,
                   layerOffsetY: 0,
+                  rotation: 0,
+                  rotationAtDragStart: 0,
+                  dragStartAngle: 0,
                   currentBounds: { x: bx, y: by, width: bw, height: bh },
                   activeHandle: null,
                   dragStartX: 0,
