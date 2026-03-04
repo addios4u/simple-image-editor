@@ -41,7 +41,8 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
   }, [text]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Cmd+Enter / Ctrl+Enter → 확정
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       const trimmed = text.trim();
       if (trimmed) onConfirm(text);
@@ -50,6 +51,7 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
       e.preventDefault();
       onCancel();
     }
+    // Enter 단독 → 기본 개행 동작 (preventDefault 없음)
   }, [text, onConfirm, onCancel]);
 
   const scaledFontSize = fontSize * zoom;
@@ -70,7 +72,7 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="텍스트 입력… (Enter: 확정, Shift+Enter: 줄바꿈, Esc: 취소)"
+        placeholder="입력 후 Cmd+Enter(Ctrl+Enter)로 확정, Esc로 취소"
         rows={1}
         style={{
           fontFamily,
@@ -80,15 +82,19 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
           color: fillColor,
           lineHeight: 1.2,
           background: 'rgba(0,0,0,0.05)',
-          border: '1.5px dashed #0088ff',
-          outline: 'none',
+          // outline을 사용해 box model에 영향 없이 포커스 표시 → 좌표 일치
+          outline: '1.5px dashed #0088ff',
+          border: 'none',
           resize: 'none',
           overflow: 'hidden',
+          // padding 제거 → canvas의 (x, y)와 텍스트 시작 위치 일치
+          padding: 0,
+          margin: 0,
           minWidth: `${Math.max(120, scaledFontSize * 4)}px`,
           minHeight: `${scaledFontSize * 1.4}px`,
-          padding: '2px 4px',
-          boxSizing: 'border-box',
+          boxSizing: 'content-box',
           whiteSpace: 'pre',
+          display: 'block',
         }}
       />
     </div>
