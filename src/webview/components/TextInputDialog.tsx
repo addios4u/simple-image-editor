@@ -24,6 +24,7 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
   const fontBold = useEditorStore((s) => s.fontBold);
   const fontItalic = useEditorStore((s) => s.fontItalic);
   const fillColor = useEditorStore((s) => s.fillColor);
+  const setFillColor = useEditorStore((s) => s.setFillColor);
   const setFontFamily = useEditorStore((s) => s.setFontFamily);
   const setFontSize = useEditorStore((s) => s.setFontSize);
   const setFontBold = useEditorStore((s) => s.setFontBold);
@@ -110,16 +111,17 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
           >
             <Italic size={13} />
           </button>
-          <div
-            title={`텍스트 색상: ${fillColor}`}
-            style={{
-              width: 18, height: 18,
-              borderRadius: 3,
-              background: fillColor,
-              border: '1px solid #777',
-              flexShrink: 0,
-            }}
-          />
+          <label
+            title="텍스트 색상"
+            style={{ width: 18, height: 18, borderRadius: 3, background: fillColor, border: '1px solid #777', flexShrink: 0, cursor: 'pointer', position: 'relative', display: 'inline-block' }}
+          >
+            <input
+              type="color"
+              value={fillColor}
+              onChange={(e) => setFillColor(e.target.value)}
+              style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
+            />
+          </label>
         </div>
 
         {/* 텍스트 입력 */}
