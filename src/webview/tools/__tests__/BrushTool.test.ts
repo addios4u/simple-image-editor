@@ -122,9 +122,16 @@ describe('BrushTool', () => {
       tool.onPointerMove(makeEvent(30, 40));
       tool.onPointerMove(makeEvent(50, 60));
 
-      // 1 from pointerDown + 2 from pointerMove
-      expect(config.brushStrokeLayer).toHaveBeenCalledTimes(3);
-      expect(config.requestRender).toHaveBeenCalledTimes(3);
+      // 보간으로 인해 이벤트 사이를 채우므로 최소 3회 이상 호출된다.
+      // (pointerDown 1회 + 각 pointerMove마다 거리/spacing 만큼 보간)
+      const callCount = (config.brushStrokeLayer as ReturnType<typeof vi.fn>).mock.calls.length;
+      expect(callCount).toBeGreaterThanOrEqual(3);
+      expect(config.requestRender).toHaveBeenCalledTimes(callCount);
+
+      // 첫 호출은 pointerDown 위치, 마지막 호출은 최종 위치
+      const calls = (config.brushStrokeLayer as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0].slice(1, 3)).toEqual([10, 20]);
+      expect(calls[calls.length - 1].slice(1, 3)).toEqual([50, 60]);
     });
 
     it('does not call brushStrokeLayer on pointerMove when not drawing', () => {
