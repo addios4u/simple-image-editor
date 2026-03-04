@@ -60,6 +60,10 @@ const App: React.FC = () => {
                                     name: l.name,
                                     opacity: l.opacity,
                                     visible: l.visible,
+                                    locked: false,
+                                    blendMode: 'Normal',
+                                    offsetX: 0,
+                                    offsetY: 0,
                                 })),
                             );
                         } else {

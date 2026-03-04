@@ -118,6 +118,11 @@ export interface WasmLayerCompositor {
   set_floating_offset(x: number, y: number): void;
   clear_floating_layer(): void;
   has_floating_layer(): boolean;
+  // Context menu pixel operations
+  clear_masked_pixels(layer_idx: number, mask: Uint8Array): void;
+  fill_masked_pixels(layer_idx: number, mask: Uint8Array, r: number, g: number, b: number, a: number): void;
+  stroke_masked_boundary(layer_idx: number, mask: Uint8Array, r: number, g: number, b: number, a: number, width: number): void;
+  crop_canvas(x: number, y: number, w: number, h: number): void;
   free(): void;
 }
 

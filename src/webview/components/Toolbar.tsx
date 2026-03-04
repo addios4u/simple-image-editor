@@ -53,7 +53,7 @@ const Toolbar: React.FC = () => {
   const handleExport = useCallback(() => {
     try {
       const bytes = compositeToBytes('png');
-      const blob = new Blob([bytes], { type: 'image/png' });
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

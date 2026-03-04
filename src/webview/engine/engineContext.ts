@@ -453,6 +453,97 @@ export function clearFloatingLayer(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Context menu pixel operations
+// ---------------------------------------------------------------------------
+
+export function clearMaskedPixels(layerId: string, mask: Uint8Array): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.clear_masked_pixels(idx, mask);
+}
+
+export function fillMaskedPixels(
+  layerId: string,
+  mask: Uint8Array,
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.fill_masked_pixels(idx, mask, r, g, b, a);
+}
+
+export function strokeMaskedBoundary(
+  layerId: string,
+  mask: Uint8Array,
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+  width: number,
+): void {
+  const idx = layerIndexMap.get(layerId);
+  if (idx === undefined || !compositor) return;
+  compositor.stroke_masked_boundary(idx, mask, r, g, b, a, width);
+}
+
+export function cropCanvas(x: number, y: number, w: number, h: number): void {
+  if (!compositor) return;
+  compositor.crop_canvas(x, y, w, h);
+  canvasWidth = w;
+  canvasHeight = h;
+}
+
+/**
+ * Copy the selection region from the currently rendered canvas to a PNG Blob.
+ * Uses the bound canvasCtx to read pixels directly — no WASM extraction needed.
+ */
+export async function copySelectionToBlob(
+  selectionBounds: { x: number; y: number; w: number; h: number },
+): Promise<Blob | null> {
+  if (!canvasCtx) return null;
+  const { x, y, w, h } = selectionBounds;
+  if (w <= 0 || h <= 0) return null;
+
+  const imageData = canvasCtx.getImageData(x, y, w, h);
+  const offscreen = new OffscreenCanvas(w, h);
+  const ctx2 = offscreen.getContext('2d');
+  if (!ctx2) return null;
+  ctx2.putImageData(imageData, 0, 0);
+  return offscreen.convertToBlob({ type: 'image/png' });
+}
+
+/**
+ * Paste a PNG Blob as a new layer. Returns the new layerId or null on failure.
+ * Caller must also call addLayer() on engineContext to register the layer index.
+ */
+export async function pasteImageAsNewLayer(
+  blob: Blob,
+  newLayerId: string,
+): Promise<boolean> {
+  if (!compositor || !wasmMemory) return false;
+
+  const bitmap = await createImageBitmap(blob);
+  const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx2 = offscreen.getContext('2d');
+  if (!ctx2) {
+    bitmap.close();
+    return false;
+  }
+  ctx2.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const imageData = ctx2.getImageData(0, 0, offscreen.width, offscreen.height);
+  const idx = addLayer(newLayerId);
+  if (idx < 0) return false;
+
+  compositor.set_layer_data(idx, new Uint8Array(imageData.data.buffer));
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 

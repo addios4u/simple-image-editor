@@ -13,10 +13,14 @@ import {
   extractMaskedPixels, stampBufferOntoLayer,
   setFloatingLayer, setFloatingOffset, clearFloatingLayer,
   captureLayerRegion, restoreLayerRegion,
+  clearMaskedPixels, fillMaskedPixels, strokeMaskedBoundary,
+  cropCanvas, copySelectionToBlob, pasteImageAsNewLayer,
+  addLayer,
 } from '../engine/engineContext';
 import { RenderLoop } from '../engine/renderLoop';
 import { hexToPackedRGBA } from '../engine/helpers';
 import { useLayerStore } from '../state/layerStore';
+import { useHistoryStore } from '../state/historyStore';
 import { getSelectionMask } from '../engine/selectionMask';
 
 /** Lazy config — getters read current store state on each call. */
@@ -70,6 +74,13 @@ const moveConfig: MoveToolConfig = {
 
 // Shared mutable ref for contour data — written by MarqueeTool, read by overlay renderer.
 let sharedContour: Array<Array<[number, number]>> | null = null;
+
+function hexToRgba(hex: string): [number, number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b, 255];
+}
 
 const marqueeConfig: MarqueeToolConfig = {
   setSelection: (rect) => useEditorStore.getState().setSelection(rect),
@@ -132,6 +143,7 @@ const Canvas: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const antsOffsetRef = useRef(0);
   const antsRafRef = useRef<number>(0);
+  const internalClipboardBlobRef = useRef<Blob | null>(null);
 
   // Setup canvas 2D context and render loop on mount
   useEffect(() => {
@@ -316,10 +328,150 @@ const Canvas: React.FC = () => {
           y={contextMenu.y}
           hasSelection={!!selection}
           onClose={() => setContextMenu(null)}
-          onAction={(action: ContextMenuAction) => {
+          onAction={async (action: ContextMenuAction) => {
             setContextMenu(null);
-            // TODO: 각 action 처리 (Phase 2에서 연동)
-            console.log('Context menu action:', action);
+            const mask = getSelectionMask();
+            const maskData = mask?.getMaskData();
+            const { activeLayerId } = useLayerStore.getState();
+            const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
+            const { fillColor, strokeColor, strokeWidth, setSelection, setCanvasSize } = useEditorStore.getState();
+
+            switch (action) {
+              case 'copy': {
+                if (!mask || !selection) break;
+                const bounds = mask.getBounds();
+                if (!bounds) break;
+                const blob = await copySelectionToBlob({
+                  x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height,
+                });
+                if (!blob) break;
+                internalClipboardBlobRef.current = blob;
+                try {
+                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                } catch (e) {
+                  console.warn('System clipboard not available:', e);
+                }
+                break;
+              }
+              case 'paste': {
+                let blobToPaste: Blob | null = null;
+                try {
+                  const items = await navigator.clipboard.read();
+                  for (const item of items) {
+                    const imageType = item.types.find((t) => t.startsWith('image/'));
+                    if (imageType) {
+                      blobToPaste = await item.getType(imageType);
+                      break;
+                    }
+                    if (item.types.includes('text/plain')) {
+                      const text = await item.getType('text/plain').then((b) => b.text());
+                      console.log('텍스트 클립보드 - TextTool 구현 후 연동 예정:', text);
+                      break;
+                    }
+                  }
+                } catch (e) {
+                  console.warn('System clipboard read failed, trying internal clipboard:', e);
+                  blobToPaste = internalClipboardBlobRef.current;
+                }
+                if (!blobToPaste) break;
+                const newLayerStore = useLayerStore.getState();
+                newLayerStore.addLayer();
+                const newLayers = useLayerStore.getState().layers;
+                const newLayer = newLayers[newLayers.length - 1];
+                if (!newLayer) break;
+                const ok = await pasteImageAsNewLayer(blobToPaste, newLayer.id);
+                if (ok) {
+                  useLayerStore.getState().setActiveLayer(newLayer.id);
+                  requestRender();
+                } else {
+                  useLayerStore.getState().removeLayer(newLayer.id);
+                }
+                break;
+              }
+              case 'clear': {
+                if (!maskData || !activeLayerId || !selection) break;
+                const before = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (!before) break;
+                const entryId = pushEditWithSnapshot(
+                  'Clear Selection', activeLayerId, before,
+                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
+                );
+                clearMaskedPixels(activeLayerId, maskData);
+                const after = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (after) commitSnapshot(entryId, after);
+                requestRender();
+                break;
+              }
+              case 'fill': {
+                if (!maskData || !activeLayerId || !selection) break;
+                const [fr, fg, fb, fa] = hexToRgba(fillColor);
+                const before = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (!before) break;
+                const entryId = pushEditWithSnapshot(
+                  'Fill Selection', activeLayerId, before,
+                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
+                );
+                fillMaskedPixels(activeLayerId, maskData, fr, fg, fb, fa);
+                const after = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (after) commitSnapshot(entryId, after);
+                requestRender();
+                break;
+              }
+              case 'stroke': {
+                if (!maskData || !activeLayerId || !selection) break;
+                const [sr, sg, sb, sa] = hexToRgba(strokeColor);
+                const before = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (!before) break;
+                const entryId = pushEditWithSnapshot(
+                  'Stroke Selection', activeLayerId, before,
+                  { x: selection.x, y: selection.y, w: selection.width, h: selection.height },
+                );
+                strokeMaskedBoundary(activeLayerId, maskData, sr, sg, sb, sa, strokeWidth);
+                const after = captureLayerRegion(
+                  activeLayerId, selection.x, selection.y, selection.width, selection.height,
+                );
+                if (after) commitSnapshot(entryId, after);
+                requestRender();
+                break;
+              }
+              case 'crop': {
+                if (!selection) break;
+                const { x, y, width: w, height: h } = selection;
+                // Capture full-canvas snapshot using a 1x1 fallback region for history
+                const before = captureLayerRegion(activeLayerId, 0, 0, 1, 1);
+                if (before) {
+                  const entryId = pushEditWithSnapshot(
+                    'Crop Canvas', activeLayerId, before,
+                    { x: 0, y: 0, w: 1, h: 1 },
+                  );
+                  cropCanvas(x, y, w, h);
+                  setCanvasSize(w, h);
+                  setSelection(null);
+                  const after = captureLayerRegion(activeLayerId, 0, 0, 1, 1);
+                  if (after) commitSnapshot(entryId, after);
+                } else {
+                  cropCanvas(x, y, w, h);
+                  setCanvasSize(w, h);
+                  setSelection(null);
+                }
+                requestRender();
+                break;
+              }
+              case 'freeTransform': {
+                console.log('Free Transform: 추후 구현');
+                break;
+              }
+            }
           }}
         />
       )}
