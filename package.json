@@ -2,7 +2,7 @@
     "name": "simple-image-editor",
     "displayName": "Simple Image Editor",
     "description": "A simple image editor for VSCode with layers, brushes, filters, and AI image generation — powered by Rust/WASM engine",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "publisher": "addios4u",
     "license": "MIT",
     "engines": {

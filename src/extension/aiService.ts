@@ -73,12 +73,13 @@ async function generateGoogle(apiKey: string, prompt: string, size: string): Pro
     const config = vscode.workspace.getConfiguration('simpleImageEditor.ai');
     const model = config.get<string>('googleModel') || 'imagen-3.0-generate-001';
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
 
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
             prompt,
