@@ -14,7 +14,7 @@ vi.mock('../components/EditorMode', () => ({
 const mockPostMessage = vi.fn();
 vi.mock('../vscode', () => ({
   default: {
-    postMessage: (...args: any[]) => mockPostMessage(...args),
+    postMessage: (...args: any[]) => (mockPostMessage as any)(...args),
     getState: vi.fn(),
     setState: vi.fn(),
   },
@@ -50,24 +50,24 @@ const mockEncodeLayerToPng = vi.fn(() => new Uint8Array([0x89, 0x50, 0x4e, 0x47]
 const mockApplyAIImageAsLayer = vi.fn(async () => true);
 
 vi.mock('../engine/engineContext', () => ({
-  initEngine: (...args: any[]) => mockInitEngine(...args),
-  loadImage: (...args: any[]) => mockLoadImage(...args),
-  requestRender: (...args: any[]) => mockRequestRender(...args),
-  compositeToBytes: (...args: any[]) => mockCompositeToBytes(...args),
-  encodeLayerToPng: (...args: any[]) => mockEncodeLayerToPng(...args),
-  applyAIImageAsLayer: (...args: any[]) => mockApplyAIImageAsLayer(...args),
+  initEngine: (...args: any[]) => (mockInitEngine as any)(...args),
+  loadImage: (...args: any[]) => (mockLoadImage as any)(...args),
+  requestRender: (...args: any[]) => (mockRequestRender as any)(...args),
+  compositeToBytes: (...args: any[]) => (mockCompositeToBytes as any)(...args),
+  encodeLayerToPng: (...args: any[]) => (mockEncodeLayerToPng as any)(...args),
+  applyAIImageAsLayer: (...args: any[]) => (mockApplyAIImageAsLayer as any)(...args),
 }));
 
 // Mock openraster
 const mockWriteOra = vi.fn(() => new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
 vi.mock('../engine/openraster', () => ({
-  writeOra: (...args: any[]) => mockWriteOra(...args),
+  writeOra: (...args: any[]) => (mockWriteOra as any)(...args),
 }));
 
 // Mock WASM loader
 const mockLoadWasmModule = vi.fn();
 vi.mock('../engine/loadWasm', () => ({
-  loadWasmModule: (...args: any[]) => mockLoadWasmModule(...args),
+  loadWasmModule: (...args: any[]) => (mockLoadWasmModule as any)(...args),
 }));
 
 import App from '../App';
