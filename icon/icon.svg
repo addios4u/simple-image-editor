@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="canvas-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="brush-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="stroke-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#f472b6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="256" height="256" rx="48" ry="48" fill="url(#bg)"/>
+
+  <!-- Image canvas (rounded rect representing the image) -->
+  <rect x="40" y="48" width="140" height="112" rx="12" ry="12" fill="url(#canvas-fill)" opacity="0.95"/>
+
+  <!-- Checkerboard pattern hint (transparency grid) -->
+  <rect x="40" y="48" width="140" height="112" rx="12" ry="12" fill="none" stroke="#94a3b8" stroke-width="1" opacity="0.3"/>
+
+  <!-- Mountain/landscape silhouette inside canvas -->
+  <path d="M40 140 L80 95 L105 120 L130 80 L180 140 L180 148 Q180 160 168 160 L52 160 Q40 160 40 148 Z" fill="#334155" opacity="0.5"/>
+
+  <!-- Sun circle in canvas -->
+  <circle cx="72" cy="78" r="12" fill="#fbbf24" opacity="0.7"/>
+
+  <!-- Layer indicators (stacked cards behind) -->
+  <rect x="48" y="56" width="140" height="112" rx="12" ry="12" fill="none" stroke="#64748b" stroke-width="1.5" opacity="0.3"/>
+  <rect x="56" y="64" width="140" height="112" rx="12" ry="12" fill="none" stroke="#64748b" stroke-width="1.5" opacity="0.2"/>
+
+  <!-- Brush/pen tool -->
+  <g transform="translate(155, 100) rotate(-45)">
+    <!-- Pen body -->
+    <rect x="0" y="-8" width="72" height="16" rx="4" ry="4" fill="url(#brush-grad)"/>
+    <!-- Pen tip -->
+    <polygon points="72,-8 72,8 88,0" fill="#e2e8f0"/>
+    <!-- Pen grip lines -->
+    <line x1="18" y1="-8" x2="18" y2="8" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <line x1="26" y1="-8" x2="26" y2="8" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Color brush stroke -->
+  <path d="M58 195 Q80 185 110 192 Q140 200 165 188 Q185 180 210 185"
+        fill="none" stroke="url(#stroke-grad)" stroke-width="8" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Small color dots -->
+  <circle cx="60" cy="215" r="8" fill="#38bdf8"/>
+  <circle cx="82" cy="215" r="8" fill="#a855f7"/>
+  <circle cx="104" cy="215" r="8" fill="#f472b6"/>
+  <circle cx="126" cy="215" r="8" fill="#fbbf24"/>
+</svg>
