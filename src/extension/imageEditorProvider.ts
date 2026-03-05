@@ -372,6 +372,11 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
                 }
                 break;
             }
+            case 'open-external': {
+                const { url } = message.body;
+                vscode.env.openExternal(vscode.Uri.parse(url));
+                break;
+            }
         }
     }
 

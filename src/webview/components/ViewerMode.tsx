@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { useEditorStore } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
+import BuyMeACoffee from './BuyMeACoffee';
 import Minimap from './Minimap';
 
 function hexToRgb(hex: string): string {
@@ -174,6 +175,7 @@ const ViewerMode: React.FC = () => {
         </span>
         <div className="toolbar-spacer" />
         <ModeSegment />
+        <BuyMeACoffee />
       </div>
       <div className="toolbar-divider" />
       <div className="canvas-area-wrapper">

@@ -17,7 +17,8 @@ export type WebviewToExtMessage =
   | { type: 'getOraDataResponse'; body: { requestId: string; data: number[]; layerCount: number } }
   | { type: 'requestSaveAs'; body: { format: string } }
   | { type: 'aiGenerate'; body: { prompt: string; provider: string; size: string } }
-  | { type: 'aiConfigureKey'; body: { provider: string; action: 'save' | 'remove'; key?: string } };
+  | { type: 'aiConfigureKey'; body: { provider: string; action: 'save' | 'remove'; key?: string } }
+  | { type: 'open-external'; body: { url: string } };
 
 export interface EditOperation {
   id: string;

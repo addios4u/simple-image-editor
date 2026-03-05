@@ -3,6 +3,7 @@ import { Minus, Plus, MousePointer2, BoxSelect, Circle, PenLine, Type, Download,
 import { useEditorStore, type ToolType } from '../state/editorStore';
 import { useLayerStore } from '../state/layerStore';
 import ModeSegment from './ModeSegment';
+import BuyMeACoffee from './BuyMeACoffee';
 import TextOptionsBar from './TextOptionsBar';
 import FilterMenu from './FilterMenu';
 import { compositeToBytes } from '../engine/engineContext';
@@ -171,6 +172,7 @@ const Toolbar: React.FC = () => {
       </span>
       <div className="toolbar-spacer" />
       <ModeSegment />
+      <BuyMeACoffee />
     </div>
   );
 };
