@@ -7,7 +7,7 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/addios4u.simple-image-editor)](https://marketplace.visualstudio.com/items?itemName=addios4u.simple-image-editor)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/addios4u.simple-image-editor)](https://marketplace.visualstudio.com/items?itemName=addios4u.simple-image-editor)
 
-![Simple Image Editor](screenshots/01.png)
+![Simple Image Editor](https://raw.githubusercontent.com/addios4u/simple-image-editor/main/screenshots/01.png)
 
 ## Features
 
@@ -30,7 +30,7 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 - Thumbnail previews
 - Porter-Duff alpha compositing in WASM
 
-![Layer System](screenshots/02.png)
+![Layer System](https://raw.githubusercontent.com/addios4u/simple-image-editor/main/screenshots/02.png)
 
 ### Filters
 
@@ -47,7 +47,7 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 - Fill selection or entire layer (`Alt+Backspace`)
 - Stroke selection border
 
-![Editing Tools](screenshots/03.png)
+![Editing Tools](https://raw.githubusercontent.com/addios4u/simple-image-editor/main/screenshots/03.png)
 
 ### Undo / Redo
 
@@ -63,14 +63,14 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 - Results placed on a new layer
 - API keys stored securely via VSCode SecretStorage
 
-![AI & Properties](screenshots/04.png)
+![AI & Properties](https://raw.githubusercontent.com/addios4u/simple-image-editor/main/screenshots/04.png)
 
 ### Viewer & Editor Modes
 
 - **Viewer Mode**: Pan & zoom with scroll wheel and drag
 - **Editor Mode**: Full editing toolbox with sidebar tabs (Layers, Properties, AI)
 
-![Full Editor](screenshots/05.png)
+![Full Editor](https://raw.githubusercontent.com/addios4u/simple-image-editor/main/screenshots/05.png)
 
 ## Supported Formats
 
