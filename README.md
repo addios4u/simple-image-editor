@@ -13,13 +13,13 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 
 ### Drawing & Editing Tools
 
-| Tool | Description | Shortcut |
-|------|-------------|----------|
-| Select | Object selection & move with bounding box handles | `V` |
-| Marquee | Rectangular area selection with marching ants | `M` |
-| Brush | Freehand drawing with size, hardness, and color control | `B` |
-| Text | Place and rasterize text on canvas | `T` |
-| Zoom | Zoom in/out, fit viewport | `Z` |
+| Tool    | Description                                             | Shortcut |
+| ------- | ------------------------------------------------------- | -------- |
+| Select  | Object selection & move with bounding box handles       | `V`      |
+| Marquee | Rectangular area selection with marching ants           | `M`      |
+| Brush   | Freehand drawing with size, hardness, and color control | `B`      |
+| Text    | Place and rasterize text on canvas                      | `T`      |
+| Zoom    | Zoom in/out, fit viewport                               | `Z`      |
 
 ### Layer System
 
@@ -75,12 +75,14 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 ## Supported Formats
 
 | Format | Open | Save |
-|--------|------|------|
-| PNG | ✅ | ✅ |
-| JPEG | ✅ | ✅ |
-| GIF | ✅ | ✅ |
-| SVG | ✅ | — |
-| ORA | ✅ | — |
+| ------ | ---- | ---- |
+| PNG    | ✅   | ✅   |
+| JPEG   | ✅   | ✅   |
+| GIF*   | ✅   | ✅   |
+| SVG    | ✅   | —    |
+| ORA    | ✅   | ✅   |
+
+> *GIF: Animated GIFs are opened as a single static frame. Animation is not preserved on save.
 
 ## Getting Started
 
@@ -94,21 +96,21 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 1. Open `Cmd+Shift+P` → **"Image Editor: Configure AI"**
 2. Enter your API key (OpenAI or Google)
 3. Select your preferred provider in Settings:
-   - `simpleImageEditor.ai.provider`: `openai` or `google`
-   - `simpleImageEditor.ai.openaiModel`: `dall-e-3` or `dall-e-2`
-   - `simpleImageEditor.ai.googleModel`: `imagen-3.0-generate-001` or `imagen-2.0-generate-001`
+    - `simpleImageEditor.ai.provider`: `openai` or `google`
+    - `simpleImageEditor.ai.openaiModel`: `dall-e-3` or `dall-e-2`
+    - `simpleImageEditor.ai.googleModel`: `imagen-3.0-generate-001` or `imagen-2.0-generate-001`
 
 ## Development
 
 ### Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Extension Host | TypeScript / Node.js |
-| Webview UI | React 18 + Zustand |
-| Image Engine | Rust → WebAssembly |
-| Build | Webpack (dual target) |
-| Test | Vitest + cargo test |
+| Layer          | Technology            |
+| -------------- | --------------------- |
+| Extension Host | TypeScript / Node.js  |
+| Webview UI     | React 18 + Zustand    |
+| Image Engine   | Rust → WebAssembly    |
+| Build          | Webpack (dual target) |
+| Test           | Vitest + cargo test   |
 
 ### Prerequisites
 

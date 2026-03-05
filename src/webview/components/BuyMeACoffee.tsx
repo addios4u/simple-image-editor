@@ -4,7 +4,7 @@ import vscodeApi from '../vscode';
 
 const BuyMeACoffee: React.FC = () => {
   const handleClick = () => {
-    vscodeApi.postMessage({ type: 'open-external', url: 'https://buymeacoffee.com/addios4u' });
+    vscodeApi.postMessage({ type: 'open-external', body: { url: 'https://buymeacoffee.com/addios4u' } });
   };
 
   return (
