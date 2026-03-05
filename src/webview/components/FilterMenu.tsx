@@ -1,14 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import FilterDialog, { type FilterType } from './FilterDialog';
+import { t } from '../i18n';
 
 interface FilterMenuProps {
   onClose: () => void;
 }
 
-const FILTERS: { type: FilterType; label: string; description: string }[] = [
-  { type: 'gaussian', label: '가우시안 블러', description: '부드러운 흐림 효과' },
-  { type: 'motion', label: '모션 블러', description: '방향성 흐림 효과' },
-];
+function getFilters(): { type: FilterType; label: string; description: string }[] {
+  return [
+    { type: 'gaussian', label: t('Gaussian Blur'), description: t('Soft blur effect') },
+    { type: 'motion', label: t('Motion Blur'), description: t('Directional blur effect') },
+  ];
+}
 
 const FilterMenu: React.FC<FilterMenuProps> = ({ onClose }) => {
   const [activeFilter, setActiveFilter] = React.useState<FilterType | null>(null);
@@ -39,7 +42,7 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClose }) => {
 
   return (
     <div ref={menuRef} style={menuStyle} data-testid="filter-menu">
-      {FILTERS.map((f) => (
+      {getFilters().map((f) => (
         <button
           key={f.type}
           style={menuItemStyle}

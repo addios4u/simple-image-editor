@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextData } from '../state/layerStore';
 import { useEditorStore } from '../state/editorStore';
+import { t } from '../i18n';
 
 interface TextInputOverlayProps {
   /** Canvas 좌표 (zoom 적용 전) */
@@ -85,7 +86,7 @@ const TextInputOverlay: React.FC<TextInputOverlayProps> = ({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="입력 후 Cmd+Enter(Ctrl+Enter)로 확정, Esc로 취소"
+        placeholder={t('Type then Cmd+Enter to confirm, Esc to cancel')}
         rows={1}
         style={{
           fontFamily,

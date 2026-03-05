@@ -17,11 +17,11 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         'simpleImageEditor.configureAI',
         async () => {
             const provider = await vscode.window.showInputBox({
-                prompt: 'Select AI provider',
-                placeHolder: 'openai or google',
+                prompt: vscode.l10n.t('Select AI provider'),
+                placeHolder: vscode.l10n.t('openai or google'),
                 validateInput: (value) => {
                     if (value !== 'openai' && value !== 'google') {
-                        return 'Please enter "openai" or "google"';
+                        return vscode.l10n.t('Please enter "openai" or "google"');
                     }
                     return null;
                 },
@@ -29,7 +29,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 
             if (provider) {
                 vscode.window.showInformationMessage(
-                    `AI provider set to: ${provider}`
+                    vscode.l10n.t('AI provider set to: {0}', provider)
                 );
             }
         }

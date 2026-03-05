@@ -56,7 +56,7 @@ vi.mock('../../state/editorStore', () => ({
 
 import FilterDialog from '../FilterDialog';
 
-describe('FilterDialog - 가우시안 블러', () => {
+describe('FilterDialog - Gaussian Blur', () => {
   const onClose = vi.fn();
 
   beforeEach(() => {
@@ -64,62 +64,62 @@ describe('FilterDialog - 가우시안 블러', () => {
     mockSelection = null;
   });
 
-  it('가우시안 블러 다이얼로그가 제목과 슬라이더를 렌더링한다', () => {
+  it('renders gaussian blur dialog with title and slider', () => {
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    expect(screen.getByText('가우시안 블러')).toBeInTheDocument();
-    expect(screen.getByText(/강도 \(Sigma\)/)).toBeInTheDocument();
+    expect(screen.getByText('Gaussian Blur')).toBeInTheDocument();
+    expect(screen.getByText(/Strength \(Sigma\)/)).toBeInTheDocument();
   });
 
-  it('선택 영역이 없으면 "레이어 전체에 적용" 표시', () => {
+  it('shows "Apply to entire layer" when no selection', () => {
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    expect(screen.getByText('레이어 전체에 적용')).toBeInTheDocument();
+    expect(screen.getByText('Apply to entire layer')).toBeInTheDocument();
   });
 
-  it('선택 영역이 있으면 "선택 영역에 적용" 표시', () => {
+  it('shows "Apply to selection" when selection exists', () => {
     mockSelection = { x: 10, y: 20, width: 100, height: 80 };
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    expect(screen.getByText(/선택 영역에 적용/)).toBeInTheDocument();
-    expect(screen.getByText(/100×80px/)).toBeInTheDocument();  // selection.width×selection.height
+    expect(screen.getByText(/Apply to selection/)).toBeInTheDocument();
+    expect(screen.getByText(/100×80px/)).toBeInTheDocument();
   });
 
-  it('적용 버튼 클릭 시 선택 영역 없으면 gaussianBlurLayer 호출', () => {
+  it('calls gaussianBlurLayer when Apply clicked without selection', () => {
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockGaussianBlurLayer).toHaveBeenCalledWith('layer-1', expect.any(Number));
     expect(mockGaussianBlurLayerRegion).not.toHaveBeenCalled();
     expect(mockRequestRender).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('선택 영역이 있으면 gaussianBlurLayerRegion 호출', () => {
+  it('calls gaussianBlurLayerRegion when selection exists', () => {
     mockSelection = { x: 10, y: 20, width: 100, height: 80 };
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockGaussianBlurLayerRegion).toHaveBeenCalledWith(
       'layer-1', expect.any(Number), 10, 20, 100, 80,
     );
     expect(mockGaussianBlurLayer).not.toHaveBeenCalled();
   });
 
-  it('취소 버튼 클릭 시 onClose 호출, 필터 미적용', () => {
+  it('calls onClose without applying filter when Cancel clicked', () => {
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    fireEvent.click(screen.getByText('취소'));
+    fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalled();
     expect(mockGaussianBlurLayer).not.toHaveBeenCalled();
   });
 
-  it('적용 시 history 스냅샷이 기록된다', () => {
+  it('records history snapshot when Apply clicked', () => {
     render(<FilterDialog filterType="gaussian" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockCaptureLayerRegion).toHaveBeenCalledWith('layer-1', 0, 0, 800, 600);
     expect(mockPushEditWithSnapshot).toHaveBeenCalledWith(
-      '가우시안 블러', 'layer-1', expect.anything(), { x: 0, y: 0, w: 800, h: 600 },
+      'Gaussian Blur', 'layer-1', expect.anything(), { x: 0, y: 0, w: 800, h: 600 },
     );
     expect(mockCommitSnapshot).toHaveBeenCalledWith('entry-1', expect.anything());
   });
 });
 
-describe('FilterDialog - 모션 블러', () => {
+describe('FilterDialog - Motion Blur', () => {
   const onClose = vi.fn();
 
   beforeEach(() => {
@@ -127,16 +127,16 @@ describe('FilterDialog - 모션 블러', () => {
     mockSelection = null;
   });
 
-  it('모션 블러 다이얼로그가 방향과 거리 슬라이더를 렌더링한다', () => {
+  it('renders motion blur dialog with direction and distance sliders', () => {
     render(<FilterDialog filterType="motion" onClose={onClose} />);
-    expect(screen.getByText('모션 블러')).toBeInTheDocument();
-    expect(screen.getByText(/방향 \(Angle\)/)).toBeInTheDocument();
-    expect(screen.getByText(/거리 \(Distance\)/)).toBeInTheDocument();
+    expect(screen.getByText('Motion Blur')).toBeInTheDocument();
+    expect(screen.getByText(/Direction \(Angle\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Distance/)).toBeInTheDocument();
   });
 
-  it('적용 버튼 클릭 시 선택 영역 없으면 motionBlurLayer 호출', () => {
+  it('calls motionBlurLayer when Apply clicked without selection', () => {
     render(<FilterDialog filterType="motion" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockMotionBlurLayer).toHaveBeenCalledWith(
       'layer-1', expect.any(Number), expect.any(Number),
     );
@@ -144,22 +144,22 @@ describe('FilterDialog - 모션 블러', () => {
     expect(mockRequestRender).toHaveBeenCalled();
   });
 
-  it('선택 영역이 있으면 motionBlurLayerRegion 호출', () => {
+  it('calls motionBlurLayerRegion when selection exists', () => {
     mockSelection = { x: 5, y: 10, width: 200, height: 150 };
     render(<FilterDialog filterType="motion" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockMotionBlurLayerRegion).toHaveBeenCalledWith(
       'layer-1', expect.any(Number), expect.any(Number), 5, 10, 200, 150,
     );
     expect(mockMotionBlurLayer).not.toHaveBeenCalled();
   });
 
-  it('선택 영역 있을 때 history label에 "(선택 영역)" 포함', () => {
+  it('includes "(selection)" in history label when selection exists', () => {
     mockSelection = { x: 0, y: 0, width: 50, height: 50 };
     render(<FilterDialog filterType="motion" onClose={onClose} />);
-    fireEvent.click(screen.getByText('적용'));
+    fireEvent.click(screen.getByText('Apply'));
     expect(mockPushEditWithSnapshot).toHaveBeenCalledWith(
-      '모션 블러 (선택 영역)', 'layer-1', expect.anything(), expect.anything(),
+      expect.stringContaining('Motion Blur'), 'layer-1', expect.anything(), expect.anything(),
     );
   });
 });

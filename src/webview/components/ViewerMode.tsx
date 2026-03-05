@@ -4,6 +4,7 @@ import { useEditorStore } from '../state/editorStore';
 import ModeSegment from './ModeSegment';
 import BuyMeACoffee from './BuyMeACoffee';
 import Minimap from './Minimap';
+import { t } from '../i18n';
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -136,11 +137,11 @@ const ViewerMode: React.FC = () => {
   return (
     <>
       <div className="editor-toolbar">
-        <button className="toolbar-btn" onClick={zoomOut} title="Zoom Out">
+        <button className="toolbar-btn" onClick={zoomOut} title={t('Zoom Out')}>
           <Minus size={14} />
         </button>
-        <span className="zoom-label clickable" onClick={() => setZoom(1)} title="Reset to 100%">{Math.round(zoom * 100)}%</span>
-        <button className="toolbar-btn" onClick={zoomIn} title="Zoom In">
+        <span className="zoom-label clickable" onClick={() => setZoom(1)} title={t('Reset to 100%')}>{Math.round(zoom * 100)}%</span>
+        <button className="toolbar-btn" onClick={zoomIn} title={t('Zoom In')}>
           <Plus size={14} />
         </button>
         <div className="toolbar-separator" />
@@ -149,28 +150,28 @@ const ViewerMode: React.FC = () => {
             className="color-swatch-btn"
             style={{ background: fillColor }}
             onClick={pickColor}
-            title="Pick Color (Eyedropper)"
+            title={t('Pick Color (Eyedropper)')}
           />
           <div className="color-info">
             <span
               className={`color-hex${copied === fillColor ? ' copied' : ''}`}
               onClick={() => copyToClipboard(fillColor)}
-              title="Copy HEX"
+              title={t('Copy HEX')}
             >
-              {copied === fillColor ? 'Copied!' : fillColor}
+              {copied === fillColor ? t('Copied!') : fillColor}
             </span>
             <span
               className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
               onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
-              title="Copy RGB"
+              title={t('Copy RGB')}
             >
-              {copied === `rgb(${hexToRgb(fillColor)})` ? 'Copied!' : `rgb(${hexToRgb(fillColor)})`}
+              {copied === `rgb(${hexToRgb(fillColor)})` ? t('Copied!') : `rgb(${hexToRgb(fillColor)})`}
             </span>
           </div>
         </div>
         <div className="toolbar-separator" />
         <span className="toolbar-file-label">
-          {isDirty && <span className="dirty-indicator" title="Unsaved changes">●</span>}
+          {isDirty && <span className="dirty-indicator" title={t('Unsaved changes')}>●</span>}
           {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
         </span>
         <div className="toolbar-spacer" />

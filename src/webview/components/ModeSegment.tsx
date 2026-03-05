@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, Pencil } from 'lucide-react';
 import { useEditorStore, type EditorMode } from '../state/editorStore';
+import { t } from '../i18n';
 
 const ModeSegment: React.FC = () => {
   const mode = useEditorStore((s) => s.mode);
@@ -16,19 +17,19 @@ const ModeSegment: React.FC = () => {
       <button
         className={`mode-seg-btn${mode === 'viewer' ? ' active' : ''}${isOra ? ' disabled' : ''}`}
         onClick={() => !isOra && setMode('viewer')}
-        title={isOra ? 'Viewer not available for .ora files' : 'Viewer'}
+        title={isOra ? t('Viewer not available for .ora files') : t('Viewer')}
         disabled={isOra}
       >
         <Eye size={14} />
-        <span>Viewer</span>
+        <span>{t('Viewer')}</span>
       </button>
       <button
         className={`mode-seg-btn${mode === 'editor' ? ' active' : ''}`}
         onClick={() => setMode('editor')}
-        title="Editor"
+        title={t('Editor')}
       >
         <Pencil size={14} />
-        <span>Editor</span>
+        <span>{t('Editor')}</span>
       </button>
     </div>
   );

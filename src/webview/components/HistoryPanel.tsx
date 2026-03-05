@@ -7,6 +7,7 @@ import {
   Palette, Layers, Circle,
 } from 'lucide-react';
 import { useHistoryStore } from '../state/historyStore';
+import { t } from '../i18n';
 
 /** Map history entry labels to lucide icons by keyword matching. */
 const iconKeywords: [RegExp, React.FC<{ size?: number }>][] = [
@@ -86,7 +87,7 @@ const HistoryPanel: React.FC = () => {
           className="history-action-btn"
           onClick={undo}
           disabled={!canUndo}
-          aria-label="Undo"
+          aria-label={t('Undo')}
         >
           <Undo2 size={14} />
         </button>
@@ -94,7 +95,7 @@ const HistoryPanel: React.FC = () => {
           className="history-action-btn"
           onClick={redo}
           disabled={!canRedo}
-          aria-label="Redo"
+          aria-label={t('Redo')}
         >
           <Redo2 size={14} />
         </button>
@@ -102,14 +103,14 @@ const HistoryPanel: React.FC = () => {
         <button
           className="history-action-btn"
           disabled
-          aria-label="Delete"
+          aria-label={t('Delete')}
         >
           <Trash2 size={14} />
         </button>
         <button
           className="history-action-btn"
           disabled
-          aria-label="Snapshot"
+          aria-label={t('Snapshot')}
         >
           <Camera size={14} />
         </button>

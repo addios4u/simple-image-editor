@@ -403,6 +403,7 @@ export class ImageEditorProvider implements vscode.CustomEditorProvider<ImageDoc
 </head>
 <body>
     <div id="root"></div>
+    <script nonce="${nonce}">window.__l10nBundle__=${JSON.stringify(vscode.l10n.bundle ?? null)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

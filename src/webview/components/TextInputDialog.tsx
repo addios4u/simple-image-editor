@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Bold, Italic } from 'lucide-react';
 import type { TextData } from '../state/layerStore';
 import { useEditorStore } from '../state/editorStore';
+import { t } from '../i18n';
 
 const WEB_SAFE_FONTS = [
   'sans-serif', 'serif', 'monospace',
@@ -80,7 +81,7 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
           gap: 12,
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 13, color: '#eee' }}>텍스트 입력</div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: '#eee' }}>{t('Text Input')}</div>
 
         {/* 폰트 옵션 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -100,19 +101,19 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
           <button
             onClick={() => setFontBold(!fontBold)}
             style={toggleBtnStyle(fontBold)}
-            title="Bold"
+            title={t('Bold')}
           >
             <Bold size={13} />
           </button>
           <button
             onClick={() => setFontItalic(!fontItalic)}
             style={toggleBtnStyle(fontItalic)}
-            title="Italic"
+            title={t('Italic')}
           >
             <Italic size={13} />
           </button>
           <label
-            title="텍스트 색상"
+            title={t('Text Color')}
             style={{ width: 18, height: 18, borderRadius: 3, background: fillColor, border: '1px solid #777', flexShrink: 0, cursor: 'pointer', position: 'relative', display: 'inline-block' }}
           >
             <input
@@ -130,7 +131,7 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="텍스트 입력 (Enter: 개행, Cmd+Enter: 확정, Esc: 취소)"
+          placeholder={t('Type text (Enter: new line, Cmd+Enter: confirm, Esc: cancel)')}
           rows={5}
           style={{
             fontFamily,
@@ -152,12 +153,12 @@ const TextInputDialog: React.FC<TextInputDialogProps> = ({ existing, onConfirm, 
 
         {/* 버튼 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onCancel} style={btnStyle('#3c3c3c')}>취소 (Esc)</button>
+          <button onClick={onCancel} style={btnStyle('#3c3c3c')}>{t('Cancel (Esc)')}</button>
           <button
-            onClick={() => { const t = text.trim(); if (t) onConfirm(text); else onCancel(); }}
+            onClick={() => { const trimmed = text.trim(); if (trimmed) onConfirm(text); else onCancel(); }}
             style={btnStyle('#0066cc')}
           >
-            확인 (Cmd+Enter)
+            {t('OK (Cmd+Enter)')}
           </button>
         </div>
       </div>

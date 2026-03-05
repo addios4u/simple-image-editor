@@ -3,6 +3,7 @@ import { useEditorStore } from '../state/editorStore';
 import { useLayerStore } from '../state/layerStore';
 import { fillRectLayer, requestRender } from '../engine/engineContext';
 import { hexToPackedRGBA } from '../engine/helpers';
+import { t } from '../i18n';
 
 const PropertyPanel: React.FC = () => {
   const fillColor = useEditorStore((s) => s.fillColor);
@@ -22,10 +23,10 @@ const PropertyPanel: React.FC = () => {
 
   return (
     <div className="sidebar-section" data-testid="property-panel">
-      <div className="sidebar-section-title">Properties</div>
+      <div className="sidebar-section-title">{t('Properties')}</div>
 
       <div className="property-group">
-        <div className="property-label">Fill</div>
+        <div className="property-label">{t('Fill')}</div>
         <div className="property-row">
           <input
             type="color"
@@ -35,16 +36,16 @@ const PropertyPanel: React.FC = () => {
             onInput={(e) =>
               setFillColor((e.target as HTMLInputElement).value)
             }
-            aria-label="Fill color"
+            aria-label={t('Fill color')}
           />
-          <button className="toolbar-btn" aria-label="Fill" onClick={handleFill}>
-            Fill <span className="shortcut-hint">(Alt+Backspace)</span>
+          <button className="toolbar-btn" aria-label={t('Fill')} onClick={handleFill}>
+            {t('Fill')} <span className="shortcut-hint">(Alt+Backspace)</span>
           </button>
         </div>
       </div>
 
       <div className="property-group">
-        <div className="property-label">Stroke</div>
+        <div className="property-label">{t('Stroke')}</div>
         <div className="property-row">
           <input
             type="color"
@@ -54,15 +55,15 @@ const PropertyPanel: React.FC = () => {
             onInput={(e) =>
               setStrokeColor((e.target as HTMLInputElement).value)
             }
-            aria-label="Stroke color"
+            aria-label={t('Stroke color')}
           />
-          <button className="toolbar-btn" aria-label="Stroke">
-            Stroke
+          <button className="toolbar-btn" aria-label={t('Stroke')}>
+            {t('Stroke')}
           </button>
         </div>
         <div className="property-row">
           <label className="property-label" htmlFor="stroke-width">
-            Width
+            {t('Width')}
           </label>
           <input
             id="stroke-width"
@@ -74,7 +75,7 @@ const PropertyPanel: React.FC = () => {
             step="1"
             value={strokeWidth}
             onChange={(e) => setStrokeWidth(parseInt(e.target.value, 10))}
-            aria-label="Stroke width"
+            aria-label={t('Stroke width')}
           />
           <span className="stroke-width-value">{strokeWidth}px</span>
         </div>

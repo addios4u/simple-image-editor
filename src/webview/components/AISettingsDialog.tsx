@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Settings, X, EyeOff, Eye } from 'lucide-react';
 import { AIProvider } from '../state/aiStore';
+import { t } from '../i18n';
 
 interface AISettingsDialogProps {
   provider: AIProvider;
@@ -35,12 +36,12 @@ const AISettingsDialog: React.FC<AISettingsDialogProps> = ({
         <div className="ai-settings-header">
           <div className="ai-settings-header-left">
             <Settings size={16} />
-            <span className="ai-settings-header-title">AI Settings</span>
+            <span className="ai-settings-header-title">{t('AI Settings')}</span>
           </div>
           <button
             className="ai-settings-close-btn"
             onClick={onCancel}
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
@@ -50,14 +51,14 @@ const AISettingsDialog: React.FC<AISettingsDialogProps> = ({
 
         <div className="ai-settings-body">
           <div className="ai-settings-field-group">
-            <label className="ai-settings-label">Provider</label>
+            <label className="ai-settings-label">{t('Provider')}</label>
             <div className="ai-settings-provider-display">
-              {provider === 'openai' ? 'OpenAI DALL-E' : 'Google Imagen'}
+              {provider === 'openai' ? t('OpenAI DALL-E') : t('Google Imagen')}
             </div>
           </div>
 
           <div className="ai-settings-field-group">
-            <label className="ai-settings-label" htmlFor="ai-api-key">API Key</label>
+            <label className="ai-settings-label" htmlFor="ai-api-key">{t('API Key')}</label>
             <div className="ai-settings-input-wrapper">
               <input
                 id="ai-api-key"
@@ -65,20 +66,20 @@ const AISettingsDialog: React.FC<AISettingsDialogProps> = ({
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={handleKeyChange}
-                placeholder="Enter your API key"
+                placeholder={t('Enter your API key')}
                 className="ai-settings-input"
               />
               <button
                 className="ai-settings-eye-btn"
                 onClick={() => setShowKey(!showKey)}
-                aria-label={showKey ? 'Hide key' : 'Show key'}
+                aria-label={showKey ? t('Hide key') : t('Show key')}
                 type="button"
               >
                 {showKey ? <Eye size={14} /> : <EyeOff size={14} />}
               </button>
             </div>
             <span className="ai-settings-hint">
-              Key is stored securely in VSCode SecretStorage
+              {t('Key is stored securely in VSCode SecretStorage')}
             </span>
           </div>
         </div>
@@ -87,14 +88,14 @@ const AISettingsDialog: React.FC<AISettingsDialogProps> = ({
 
         <div className="ai-settings-footer">
           <button className="ai-settings-remove-btn" onClick={onRemove}>
-            Remove Key
+            {t('Remove Key')}
           </button>
           <div className="ai-settings-footer-right">
             <button className="ai-settings-cancel-btn" onClick={onCancel}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button className="ai-settings-save-btn" onClick={handleSave}>
-              Save
+              {t('Save')}
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ExportFormat } from '../state/exportStore';
+import { t } from '../i18n';
 
 interface FormatDialogProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ const FormatDialog: React.FC<FormatDialogProps> = ({
   return (
     <div className="format-dialog-overlay" data-testid="format-dialog">
       <div className="format-dialog">
-        <h3>Export Format</h3>
+        <h3>{t('Export Format')}</h3>
 
         <div className="format-options">
           <label>
@@ -44,7 +45,7 @@ const FormatDialog: React.FC<FormatDialogProps> = ({
               onChange={() => setFormat('png')}
               aria-label="PNG"
             />
-            PNG (lossless)
+            {t('PNG (lossless)')}
           </label>
           <label>
             <input
@@ -55,7 +56,7 @@ const FormatDialog: React.FC<FormatDialogProps> = ({
               onChange={() => setFormat('jpeg')}
               aria-label="JPEG"
             />
-            JPEG (lossy)
+            {t('JPEG (lossy)')}
           </label>
           <label>
             <input
@@ -73,7 +74,7 @@ const FormatDialog: React.FC<FormatDialogProps> = ({
         {format === 'jpeg' && (
           <div className="quality-control">
             <label>
-              Quality
+              {t('Quality')}
               <input
                 type="range"
                 min="1"
@@ -88,16 +89,16 @@ const FormatDialog: React.FC<FormatDialogProps> = ({
         )}
 
         <div className="file-size-estimate">
-          <span>File Size Estimate</span>
+          <span>{t('File Size Estimate')}</span>
           <span className="estimate-value">--</span>
         </div>
 
         <div className="format-dialog-actions">
           <button className="format-save-btn" onClick={handleSave}>
-            Save
+            {t('Save')}
           </button>
           <button className="format-cancel-btn" onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
       </div>

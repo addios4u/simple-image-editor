@@ -3,17 +3,20 @@ import { useEditorStore, type SidebarTab } from '../state/editorStore';
 import LayerPanel from './LayerPanel';
 import HistoryPanel from './HistoryPanel';
 import AIPanel from './AIPanel';
+import { t } from '../i18n';
 
 interface TabDef {
   id: SidebarTab;
   label: string;
 }
 
-const tabs: TabDef[] = [
-  { id: 'layers', label: 'Layers' },
-  { id: 'history', label: 'History' },
-  { id: 'ai', label: 'AI' },
-];
+function getTabs(): TabDef[] {
+  return [
+    { id: 'layers', label: t('Layers') },
+    { id: 'history', label: t('History') },
+    { id: 'ai', label: t('AI') },
+  ];
+}
 
 const panelMap: Record<SidebarTab, React.FC> = {
   layers: LayerPanel,
@@ -29,7 +32,7 @@ const SidebarTabs: React.FC = () => {
   return (
     <div className="editor-sidebar" data-testid="sidebar-tabs">
       <div className="sidebar-tabs" role="tablist">
-        {tabs.map((tab) => (
+        {getTabs().map((tab) => (
           <button
             key={tab.id}
             role="tab"

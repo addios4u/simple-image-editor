@@ -5,6 +5,7 @@ import { useEditorStore } from '../state/editorStore';
 import { getBestApiSize } from '../utils/aiSizeUtils';
 import vscodeApi from '../vscode';
 import AISettingsDialog from './AISettingsDialog';
+import { t } from '../i18n';
 
 const AIPanel: React.FC = () => {
   const provider = useAIStore((s) => s.provider);
@@ -25,7 +26,7 @@ const AIPanel: React.FC = () => {
   // Determine target size from selection or canvas
   const targetWidth = selection ? selection.width : canvasWidth;
   const targetHeight = selection ? selection.height : canvasHeight;
-  const sizeSource = selection ? 'selection' : 'canvas';
+  const sizeSource = selection ? t('selection') : t('canvas');
 
   const handleGenerate = useCallback(() => {
     const tw = selection ? selection.width : canvasWidth;
@@ -89,10 +90,10 @@ const AIPanel: React.FC = () => {
   return (
     <div className="ai-panel" data-testid="ai-panel">
       <div className="ai-body">
-        <div className="ai-section-title">AI Image Generation</div>
+        <div className="ai-section-title">{t('AI Image Generation')}</div>
 
         <div className="ai-field-group">
-          <label className="ai-field-label" htmlFor="ai-provider">Provider</label>
+          <label className="ai-field-label" htmlFor="ai-provider">{t('Provider')}</label>
           <select
             id="ai-provider"
             className="ai-select"
@@ -100,26 +101,26 @@ const AIPanel: React.FC = () => {
             value={provider}
             onChange={handleProviderChange}
           >
-            <option value="openai">OpenAI DALL-E</option>
-            <option value="google">Google Imagen</option>
+            <option value="openai">{t('OpenAI DALL-E')}</option>
+            <option value="google">{t('Google Imagen')}</option>
           </select>
         </div>
 
         <div className="ai-field-group">
-          <label className="ai-field-label" htmlFor="ai-prompt">Prompt</label>
+          <label className="ai-field-label" htmlFor="ai-prompt">{t('Prompt')}</label>
           <textarea
             id="ai-prompt"
             className="ai-textarea"
             data-testid="ai-prompt-input"
             value={prompt}
             onChange={handlePromptChange}
-            placeholder="Describe the image you want to generate..."
+            placeholder={t('Describe the image you want to generate...')}
             rows={4}
           />
         </div>
 
         <div className="ai-size-info" data-testid="ai-size-info">
-          Size: {targetWidth} × {targetHeight} ({sizeSource})
+          {t('Size:')} {targetWidth} × {targetHeight} ({sizeSource})
         </div>
 
         <div className="ai-btn-row">
@@ -130,14 +131,14 @@ const AIPanel: React.FC = () => {
             disabled={isGenerating || prompt.trim() === ''}
           >
             <Sparkles size={14} />
-            {isGenerating ? 'Generating...' : 'Generate'}
+            {isGenerating ? t('Generating...') : t('Generate')}
           </button>
           <button
             className="ai-settings-btn"
             data-testid="ai-settings-btn"
             onClick={() => setShowSettings(true)}
-            title="Configure API Key"
-            aria-label="Settings"
+            title={t('Configure API Key')}
+            aria-label={t('Settings')}
           >
             <Settings size={16} />
           </button>
@@ -146,7 +147,7 @@ const AIPanel: React.FC = () => {
         {isGenerating && (
           <div className="ai-progress" data-testid="ai-progress">
             <Loader size={16} className="ai-spinner" />
-            <span>Generating image...</span>
+            <span>{t('Generating image...')}</span>
           </div>
         )}
 

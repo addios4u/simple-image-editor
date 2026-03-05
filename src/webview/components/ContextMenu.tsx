@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { t } from '../i18n';
 
 export type ContextMenuAction = 'copy' | 'paste' | 'clear' | 'crop' | 'freeTransform' | 'fill' | 'stroke';
 
@@ -30,18 +31,18 @@ const DIVIDER_HEIGHT = 9;
 function buildMenuItems(hasSelection: boolean): MenuEntry[] {
   if (hasSelection) {
     return [
-      { type: 'item', label: 'Copy', action: 'copy' },
-      { type: 'item', label: 'Paste', action: 'paste' },
+      { type: 'item', label: t('Copy'), action: 'copy' },
+      { type: 'item', label: t('Paste'), action: 'paste' },
       { type: 'divider' },
-      { type: 'item', label: 'Clear', action: 'clear' },
-      { type: 'item', label: 'Crop', action: 'crop' },
-      { type: 'item', label: 'Free Transform', action: 'freeTransform' },
+      { type: 'item', label: t('Clear'), action: 'clear' },
+      { type: 'item', label: t('Crop'), action: 'crop' },
+      { type: 'item', label: t('Free Transform'), action: 'freeTransform' },
       { type: 'divider' },
-      { type: 'item', label: 'Fill', action: 'fill' },
-      { type: 'item', label: 'Stroke', action: 'stroke' },
+      { type: 'item', label: t('Fill'), action: 'fill' },
+      { type: 'item', label: t('Stroke'), action: 'stroke' },
     ];
   }
-  return [{ type: 'item', label: 'Paste', action: 'paste' }];
+  return [{ type: 'item', label: t('Paste'), action: 'paste' }];
 }
 
 function estimateMenuHeight(entries: MenuEntry[]): number {

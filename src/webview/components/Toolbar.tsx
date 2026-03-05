@@ -7,6 +7,7 @@ import BuyMeACoffee from './BuyMeACoffee';
 import TextOptionsBar from './TextOptionsBar';
 import FilterMenu from './FilterMenu';
 import { compositeToBytes } from '../engine/engineContext';
+import { t } from '../i18n';
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -22,9 +23,9 @@ interface ToolDef {
 }
 
 const staticTools: ToolDef[] = [
-  { type: 'move', icon: <MousePointer2 size={18} />, label: 'Move' },
-  { type: 'brush', icon: <PenLine size={18} />, label: 'Brush' },
-  { type: 'text', icon: <Type size={18} />, label: 'Text' },
+  { type: 'move', icon: <MousePointer2 size={18} />, label: t('Move') },
+  { type: 'brush', icon: <PenLine size={18} />, label: t('Brush') },
+  { type: 'text', icon: <Type size={18} />, label: t('Text') },
 ];
 
 const Toolbar: React.FC = () => {
@@ -76,11 +77,11 @@ const Toolbar: React.FC = () => {
 
   return (
     <div className="editor-toolbar" data-testid="toolbar">
-      <button className="toolbar-btn" onClick={zoomOut} title="Zoom Out">
+      <button className="toolbar-btn" onClick={zoomOut} title={t('Zoom Out')}>
         <Minus size={14} />
       </button>
-      <span className="zoom-label clickable" onClick={() => setZoom(1)} title="Reset to 100%">{Math.round(zoom * 100)}%</span>
-      <button className="toolbar-btn" onClick={zoomIn} title="Zoom In">
+      <span className="zoom-label clickable" onClick={() => setZoom(1)} title={t('Reset to 100%')}>{Math.round(zoom * 100)}%</span>
+      <button className="toolbar-btn" onClick={zoomIn} title={t('Zoom In')}>
         <Plus size={14} />
       </button>
       <div className="toolbar-separator" />
@@ -88,7 +89,7 @@ const Toolbar: React.FC = () => {
         <label
           className="color-swatch-btn"
           style={{ background: fillColor, position: 'relative', cursor: 'pointer' }}
-          title="Pick Color"
+          title={t('Pick Color')}
         >
           <input
             type="color"
@@ -101,16 +102,16 @@ const Toolbar: React.FC = () => {
           <span
             className={`color-hex${copied === fillColor ? ' copied' : ''}`}
             onClick={() => copyToClipboard(fillColor)}
-            title="Copy HEX"
+            title={t('Copy HEX')}
           >
-            {copied === fillColor ? 'Copied!' : fillColor}
+            {copied === fillColor ? t('Copied!') : fillColor}
           </span>
           <span
             className={`color-rgb${copied === `rgb(${hexToRgb(fillColor)})` ? ' copied' : ''}`}
             onClick={() => copyToClipboard(`rgb(${hexToRgb(fillColor)})`)}
-            title="Copy RGB"
+            title={t('Copy RGB')}
           >
-            {copied === `rgb(${hexToRgb(fillColor)})` ? 'Copied!' : `rgb(${hexToRgb(fillColor)})`}
+            {copied === `rgb(${hexToRgb(fillColor)})` ? t('Copied!') : `rgb(${hexToRgb(fillColor)})`}
           </span>
         </div>
       </div>
@@ -120,7 +121,7 @@ const Toolbar: React.FC = () => {
         {
           type: 'select' as ToolType,
           icon: selectionShape === 'ellipse' ? <Circle size={18} /> : <BoxSelect size={18} />,
-          label: selectionShape === 'ellipse' ? 'Select (Ellipse)' : 'Select (Rect)',
+          label: selectionShape === 'ellipse' ? t('Select (Ellipse)') : t('Select (Rect)'),
         },
         staticTools[1],
         staticTools[2],
@@ -148,7 +149,7 @@ const Toolbar: React.FC = () => {
         <button
           className={`toolbar-btn${filterMenuOpen ? ' active' : ''}`}
           onClick={() => setFilterMenuOpen((v) => !v)}
-          title="필터"
+          title={t('Filter')}
           data-testid="filter-toolbar-btn"
         >
           <SlidersHorizontal size={18} />
@@ -161,13 +162,13 @@ const Toolbar: React.FC = () => {
       <button
         className="toolbar-btn"
         onClick={handleExport}
-        title="Export"
+        title={t('Export')}
       >
         <Download size={18} />
       </button>
       <div className="toolbar-separator" />
       <span className="toolbar-file-label">
-        {isDirty && <span className="dirty-indicator" title="Unsaved changes">●</span>}
+        {isDirty && <span className="dirty-indicator" title={t('Unsaved changes')}>●</span>}
         {fileName || 'untitled'} — {canvasWidth} x {canvasHeight}
       </span>
       <div className="toolbar-spacer" />

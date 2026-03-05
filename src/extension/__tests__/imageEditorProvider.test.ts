@@ -55,6 +55,10 @@ vi.mock('vscode', () => ({
     window: {
         registerCustomEditorProvider: mockRegisterCustomEditorProvider,
     },
+    l10n: {
+        t: (message: string, ...args: any[]) => message,
+        bundle: null,
+    },
     Disposable: {
         from: (...disposables: any[]) => ({ dispose: vi.fn() }),
     },

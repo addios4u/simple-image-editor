@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
+import { t } from '../i18n';
 
 export interface FillDialogResult {
   color: string;   // hex e.g. '#ff0000'
@@ -39,11 +40,11 @@ const FillDialog: React.FC<FillDialogProps> = ({ initialColor, onConfirm, onCanc
           fontFamily: 'inherit',
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: '#eee' }}>Fill</div>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: '#eee' }}>{t('Fill')}</div>
 
         {/* Color */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ width: 60 }}>Color</span>
+          <span style={{ width: 60 }}>{t('Color')}</span>
           <input
             type="color"
             value={color}
@@ -66,7 +67,7 @@ const FillDialog: React.FC<FillDialogProps> = ({ initialColor, onConfirm, onCanc
 
         {/* Opacity */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <span style={{ width: 60 }}>Opacity</span>
+          <span style={{ width: 60 }}>{t('Opacity')}</span>
           <input
             type="range"
             min={0} max={100} value={opacity}
@@ -82,13 +83,13 @@ const FillDialog: React.FC<FillDialogProps> = ({ initialColor, onConfirm, onCanc
             onClick={onCancel}
             style={btnStyle('#3c3c3c', '#555')}
           >
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             onClick={() => onConfirm({ color, opacity })}
             style={btnStyle('#0066cc', '#0077ee')}
           >
-            OK
+            {t('OK')}
           </button>
         </div>
       </div>

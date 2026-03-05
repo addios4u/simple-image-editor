@@ -3,6 +3,7 @@ import { Eye, EyeOff, Plus, Trash2, Lock, LockOpen, Type } from 'lucide-react';
 import { useLayerStore } from '../state/layerStore';
 import { useEditorStore } from '../state/editorStore';
 import { getLayerImageData, setLayerOpacity as engineSetOpacity, setLayerVisible as engineSetVisible, setLayerBlendMode as engineSetBlendMode, addLayer as engineAddLayer, removeLayer as engineRemoveLayer, moveLayer as engineMoveLayer, rebuildLayerIndexMap, requestRender } from '../engine/engineContext';
+import { t } from '../i18n';
 
 const BLEND_MODES = [
   'Normal', 'Multiply', 'Screen', 'Overlay',
@@ -215,7 +216,7 @@ const LayerPanel: React.FC = () => {
               <option key={mode} value={mode}>{mode}</option>
             ))}
           </select>
-          <span className="layer-controls-label">Opacity:</span>
+          <span className="layer-controls-label">{t('Opacity:')}</span>
           <div className="layer-opacity-wrapper" ref={opacityRowRef}>
             <input
               className="layer-opacity-input"
@@ -284,7 +285,7 @@ const LayerPanel: React.FC = () => {
                   engineSetVisible(layer.id, !layer.visible);
                   requestRender();
                 }}
-                aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
+                aria-label={layer.visible ? t('Hide layer') : t('Show layer')}
               >
                 {layer.visible
                   ? <Eye size={14} color={isActive ? '#ffffff' : '#969696'} />
@@ -307,7 +308,7 @@ const LayerPanel: React.FC = () => {
                     e.stopPropagation();
                     setLayerLocked(layer.id, !layer.locked);
                   }}
-                  aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                  aria-label={layer.locked ? t('Unlock layer') : t('Lock layer')}
                 >
                   {layer.locked
                     ? <Lock size={12} color="#969696" />
@@ -323,7 +324,7 @@ const LayerPanel: React.FC = () => {
                     requestRender();
                   }}
                   disabled={layers.length <= 1}
-                  aria-label={`Delete ${layer.name}`}
+                  aria-label={t('Delete {0}', layer.name)}
                 >
                   <Trash2 size={14} color="#969696" />
                 </button>
@@ -346,10 +347,10 @@ const LayerPanel: React.FC = () => {
             const newLayer = newLayers[newLayers.length - 1];
             engineAddLayer(newLayer.id);
           }}
-          aria-label="Add Layer"
+          aria-label={t('Add Layer')}
         >
           <Plus size={14} />
-          <span>레이어 추가</span>
+          <span>{t('Add Layer')}</span>
         </button>
       </div>
     </div>

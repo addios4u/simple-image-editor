@@ -13,6 +13,7 @@ import {
   applyFilterPreview,
   getLayerImageData,
 } from '../engine/engineContext';
+import { t } from '../i18n';
 
 export type FilterType = 'gaussian' | 'motion';
 
@@ -23,10 +24,9 @@ interface FilterDialogProps {
 
 const PREVIEW_MAX = 160;
 
-const FILTER_LABELS: Record<FilterType, string> = {
-  gaussian: '가우시안 블러',
-  motion: '모션 블러',
-};
+function getFilterLabel(type: FilterType): string {
+  return type === 'gaussian' ? t('Gaussian Blur') : t('Motion Blur');
+}
 
 const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
   const selection = useEditorStore((s) => s.selection);
@@ -139,8 +139,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
     if (beforeSnapshot) {
       const { pushEditWithSnapshot, commitSnapshot } = useHistoryStore.getState();
       const label = selection
-        ? `${FILTER_LABELS[filterType]} (선택 영역)`
-        : FILTER_LABELS[filterType];
+        ? `${getFilterLabel(filterType)} (${t('selection')})`
+        : getFilterLabel(filterType);
       const entryId = pushEditWithSnapshot(label, activeLayerId, beforeSnapshot, region);
       const afterSnapshot = captureLayerRegion(activeLayerId, 0, 0, canvasWidth, canvasHeight);
       if (afterSnapshot) commitSnapshot(entryId, afterSnapshot);
@@ -165,14 +165,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
       <div style={containerStyle}>
         {/* 헤더 */}
         <div style={{ fontWeight: 600, fontSize: 13, color: '#eee', marginBottom: 12 }}>
-          {FILTER_LABELS[filterType]}
+          {getFilterLabel(filterType)}
         </div>
 
         {/* 바디: 미리보기 + 파라미터 */}
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {/* 미리보기 캔버스 */}
           <div style={previewWrapStyle}>
-            <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>미리보기</div>
+            <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>{t('Preview')}</div>
             <div style={{
               width: PREVIEW_MAX, height: PREVIEW_MAX,
               background: '#111',
@@ -194,7 +194,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
             {filterType === 'gaussian' && (
               <SliderRow
-                label="강도 (Sigma)"
+                label={t('Strength (Sigma)')}
                 value={sigma}
                 min={0.1} max={20} step={0.1}
                 display={sigma.toFixed(1)}
@@ -204,14 +204,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
             {filterType === 'motion' && (
               <>
                 <SliderRow
-                  label="방향 (Angle)"
+                  label={t('Direction (Angle)')}
                   value={angle}
                   min={0} max={359} step={1}
                   display={`${angle}°`}
                   onChange={setAngle}
                 />
                 <SliderRow
-                  label="거리 (Distance)"
+                  label={t('Distance')}
                   value={distance}
                   min={1} max={100} step={1}
                   display={`${distance}px`}
@@ -229,16 +229,16 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ filterType, onClose }) => {
               border: `1px solid ${selection ? '#3a6ea8' : '#333'}`,
             }}>
               {selection
-                ? `선택 영역에 적용 (${selection.width}×${selection.height}px)`
-                : '레이어 전체에 적용'}
+                ? t('Apply to selection ({0}×{1}px)', String(selection.width), String(selection.height))
+                : t('Apply to entire layer')}
             </div>
           </div>
         </div>
 
         {/* 버튼 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} style={btnStyle('#3c3c3c')}>취소</button>
-          <button onClick={handleApply} style={btnStyle('#0066cc')}>적용</button>
+          <button onClick={onClose} style={btnStyle('#3c3c3c')}>{t('Cancel')}</button>
+          <button onClick={handleApply} style={btnStyle('#0066cc')}>{t('Apply')}</button>
         </div>
       </div>
     </div>

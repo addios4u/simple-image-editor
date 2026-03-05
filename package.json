@@ -1,129 +1,161 @@
 {
-  "name": "simple-image-editor",
-  "displayName": "Simple Image Editor",
-  "description": "VSCode image editor with Rust/WASM engine and React UI",
-  "version": "0.0.1",
-  "publisher": "simple-image-editor",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "packageManager": "pnpm@10.26.2",
-  "categories": [
-    "Other"
-  ],
-  "main": "./dist/extension/extension.js",
-  "contributes": {
-    "customEditors": [
-      {
-        "viewType": "simpleImageEditor.imageEditor",
-        "displayName": "Simple Image Editor",
-        "selector": [
-          {
-            "filenamePattern": "*.png"
-          },
-          {
-            "filenamePattern": "*.jpg"
-          },
-          {
-            "filenamePattern": "*.jpeg"
-          },
-          {
-            "filenamePattern": "*.svg"
-          },
-          {
-            "filenamePattern": "*.gif"
-          },
-          {
-            "filenamePattern": "*.ora"
-          }
+    "name": "simple-image-editor",
+    "displayName": "Simple Image Editor",
+    "description": "A simple image editor for VSCode with layers, brushes, filters, and AI image generation — powered by Rust/WASM engine",
+    "version": "1.0.0",
+    "publisher": "addios4u",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "packageManager": "pnpm@10.26.2",
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "image editor",
+        "image",
+        "photo",
+        "drawing",
+        "brush",
+        "filter",
+        "layer",
+        "wasm",
+        "rust",
+        "ai"
+    ],
+    "icon": "icon/icon.png",
+    "galleryBanner": {
+        "color": "#1a1a2e",
+        "theme": "dark"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/addios4u/simple-image-editor"
+    },
+    "homepage": "https://github.com/addios4u/simple-image-editor#readme",
+    "bugs": {
+        "url": "https://github.com/addios4u/simple-image-editor/issues"
+    },
+    "l10n": "./l10n",
+    "main": "./dist/extension/extension.js",
+    "contributes": {
+        "customEditors": [
+            {
+                "viewType": "simpleImageEditor.imageEditor",
+                "displayName": "Simple Image Editor",
+                "selector": [
+                    {
+                        "filenamePattern": "*.png"
+                    },
+                    {
+                        "filenamePattern": "*.jpg"
+                    },
+                    {
+                        "filenamePattern": "*.jpeg"
+                    },
+                    {
+                        "filenamePattern": "*.svg"
+                    },
+                    {
+                        "filenamePattern": "*.gif"
+                    },
+                    {
+                        "filenamePattern": "*.ora"
+                    }
+                ],
+                "priority": "default"
+            }
         ],
-        "priority": "default"
-      }
-    ],
-    "commands": [
-      {
-        "command": "simpleImageEditor.newImage",
-        "title": "New Image",
-        "category": "Image Editor"
-      },
-      {
-        "command": "simpleImageEditor.configureAI",
-        "title": "Configure AI",
-        "category": "Image Editor"
-      }
-    ],
-    "configuration": {
-      "title": "Simple Image Editor",
-      "properties": {
-        "simpleImageEditor.ai.provider": {
-          "type": "string",
-          "enum": [
-            "openai",
-            "google"
-          ],
-          "default": "openai",
-          "description": "AI image generation provider"
-        },
-        "simpleImageEditor.ai.openaiModel": {
-          "type": "string",
-          "enum": [
-            "dall-e-3",
-            "dall-e-2"
-          ],
-          "default": "dall-e-3",
-          "description": "OpenAI DALL-E model to use for image generation"
-        },
-        "simpleImageEditor.ai.googleModel": {
-          "type": "string",
-          "enum": [
-            "imagen-3.0-generate-001",
-            "imagen-2.0-generate-001"
-          ],
-          "default": "imagen-3.0-generate-001",
-          "description": "Google Imagen model to use for image generation"
+        "commands": [
+            {
+                "command": "simpleImageEditor.newImage",
+                "title": "New Image",
+                "category": "Image Editor"
+            },
+            {
+                "command": "simpleImageEditor.configureAI",
+                "title": "Configure AI",
+                "category": "Image Editor"
+            }
+        ],
+        "configuration": {
+            "title": "Simple Image Editor",
+            "properties": {
+                "simpleImageEditor.ai.provider": {
+                    "type": "string",
+                    "enum": [
+                        "openai",
+                        "google"
+                    ],
+                    "default": "openai",
+                    "description": "AI image generation provider"
+                },
+                "simpleImageEditor.ai.openaiModel": {
+                    "type": "string",
+                    "enum": [
+                        "dall-e-3",
+                        "dall-e-2"
+                    ],
+                    "default": "dall-e-3",
+                    "description": "OpenAI DALL-E model to use for image generation"
+                },
+                "simpleImageEditor.ai.googleModel": {
+                    "type": "string",
+                    "enum": [
+                        "imagen-3.0-generate-001",
+                        "imagen-2.0-generate-001"
+                    ],
+                    "default": "imagen-3.0-generate-001",
+                    "description": "Google Imagen model to use for image generation"
+                }
+            }
         }
-      }
+    },
+    "scripts": {
+        "build": "pnpm run build:wasm && pnpm run build:webpack",
+        "build:wasm": "cd src/engine && wasm-pack build --target web --out-dir ../../dist/wasm",
+        "build:webpack": "webpack --mode production",
+        "watch": "webpack --mode development --watch",
+        "test": "pnpm run test:rust && pnpm run test:extension && pnpm run test:webview",
+        "test:rust": "cd src/engine && cargo test",
+        "test:wasm": "cd src/engine && wasm-pack test --headless --chrome",
+        "test:webview": "vitest run --config vitest.config.webview.ts",
+        "test:extension": "vitest run --config vitest.config.ts",
+        "test:e2e": "node ./test/e2e/runTests.js",
+        "test:watch": "vitest --config vitest.config.webview.ts",
+        "package": "pnpm run build && vsce package --no-dependencies -o dist/sie-$npm_package_version.vsix",
+        "publish:vsce": "pnpm package && vsce publish --no-dependencies",
+        "publish:ovsx": "pnpm package && ovsx publish dist/sie-$npm_package_version.vsix",
+        "publish:all": "pnpm publish:vsce && pnpm publish:ovsx",
+        "dev": "concurrently \"pnpm run watch\" \"cd src/engine && wasm-pack build --target web --out-dir ../../dist/wasm --dev\""
+    },
+    "devDependencies": {
+        "@testing-library/jest-dom": "^6.1.5",
+        "@testing-library/react": "^14.1.2",
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "@types/vscode": "^1.85.0",
+        "@vscode/test-electron": "^2.3.8",
+        "@vscode/vsce": "^2.22.0",
+        "concurrently": "^8.2.2",
+        "css-loader": "^6.8.1",
+        "jsdom": "^23.0.1",
+        "mini-css-extract-plugin": "^2.10.0",
+        "ovsx": "^0.10.9",
+        "style-loader": "^3.3.3",
+        "ts-loader": "^9.5.1",
+        "typescript": "^5.3.3",
+        "vitest": "^1.1.0",
+        "webpack": "^5.89.0",
+        "webpack-cli": "^5.1.4"
+    },
+    "dependencies": {
+        "@vscode/l10n": "^0.0.18",
+        "fflate": "^0.8.2",
+        "lucide-react": "^0.576.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "zustand": "^4.4.7"
     }
-  },
-  "scripts": {
-    "build": "pnpm run build:wasm && pnpm run build:webpack",
-    "build:wasm": "cd src/engine && wasm-pack build --target web --out-dir ../../dist/wasm",
-    "build:webpack": "webpack --mode production",
-    "watch": "webpack --mode development --watch",
-    "test": "pnpm run test:rust && pnpm run test:extension && pnpm run test:webview",
-    "test:rust": "cd src/engine && cargo test",
-    "test:wasm": "cd src/engine && wasm-pack test --headless --chrome",
-    "test:webview": "vitest run --config vitest.config.webview.ts",
-    "test:extension": "vitest run --config vitest.config.ts",
-    "test:e2e": "node ./test/e2e/runTests.js",
-    "test:watch": "vitest --config vitest.config.webview.ts",
-    "package": "pnpm run build && vsce package --no-dependencies -o dist/sie-$npm_package_version.vsix",
-    "dev": "concurrently \"pnpm run watch\" \"cd src/engine && wasm-pack build --target web --out-dir ../../dist/wasm --dev\""
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.1.5",
-    "@testing-library/react": "^14.1.2",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.3.8",
-    "@vscode/vsce": "^2.22.0",
-    "concurrently": "^8.2.2",
-    "css-loader": "^6.8.1",
-    "jsdom": "^23.0.1",
-    "mini-css-extract-plugin": "^2.10.0",
-    "style-loader": "^3.3.3",
-    "ts-loader": "^9.5.1",
-    "typescript": "^5.3.3",
-    "vitest": "^1.1.0",
-    "webpack": "^5.89.0",
-    "webpack-cli": "^5.1.4"
-  },
-  "dependencies": {
-    "fflate": "^0.8.2",
-    "lucide-react": "^0.576.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "zustand": "^4.4.7"
-  }
 }

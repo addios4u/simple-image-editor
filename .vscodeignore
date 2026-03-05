@@ -6,7 +6,8 @@ node_modules/**
 .github/**
 .claude/**
 .omc/**
-**/*.vsix
+*.pen
+images/**
 tsconfig.json
 tsconfig.webview.json
 webpack.config.js
@@ -15,10 +16,12 @@ vitest.config.webview.ts
 .eslintrc*
 .prettierrc*
 CLAUDE.md
-README.md
+CHANGELOG.md
 pnpm-lock.yaml
 .gitignore
 .nvmrc
 **/*.map
 **/*.ts
 !dist/**
+dist/**/*.vsix
+dist/capture.png

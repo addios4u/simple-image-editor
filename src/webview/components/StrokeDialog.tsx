@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
+import { t } from '../i18n';
 
 export interface StrokeDialogResult {
   color: string;   // hex e.g. '#ff0000'
@@ -45,11 +46,11 @@ const StrokeDialog: React.FC<StrokeDialogProps> = ({
           fontFamily: 'inherit',
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: '#eee' }}>Stroke</div>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: '#eee' }}>{t('Stroke')}</div>
 
         {/* Color */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ width: 60 }}>Color</span>
+          <span style={{ width: 60 }}>{t('Color')}</span>
           <input
             type="color"
             value={color}
@@ -72,7 +73,7 @@ const StrokeDialog: React.FC<StrokeDialogProps> = ({
 
         {/* Width */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ width: 60 }}>Width</span>
+          <span style={{ width: 60 }}>{t('Width')}</span>
           <input
             type="number"
             min={1} max={100} value={width}
@@ -90,18 +91,18 @@ const StrokeDialog: React.FC<StrokeDialogProps> = ({
 
         {/* Location (display only – inner stroke) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <span style={{ width: 60 }}>Position</span>
-          <span style={{ color: '#888' }}>Inside</span>
+          <span style={{ width: 60 }}>{t('Position')}</span>
+          <span style={{ color: '#888' }}>{t('Inside')}</span>
         </div>
 
         {/* Buttons */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onCancel} style={btnStyle('#3c3c3c')}>Cancel</button>
+          <button onClick={onCancel} style={btnStyle('#3c3c3c')}>{t('Cancel')}</button>
           <button
             onClick={() => onConfirm({ color, width })}
             style={btnStyle('#0066cc')}
           >
-            OK
+            {t('OK')}
           </button>
         </div>
       </div>
