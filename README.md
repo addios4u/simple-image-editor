@@ -78,11 +78,11 @@ A powerful image editor extension for VSCode and Cursor — edit images directly
 | ------ | ---- | ---- |
 | PNG    | ✅   | ✅   |
 | JPEG   | ✅   | ✅   |
-| GIF*   | ✅   | ✅   |
+| GIF\*  | ✅   | ✅   |
 | SVG    | ✅   | —    |
 | ORA    | ✅   | ✅   |
 
-> *GIF: Animated GIFs are opened as a single static frame. Animation is not preserved on save.
+> \*GIF: Animated GIFs are opened as a single static frame. Animation is not preserved on save.
 
 ## Getting Started
 
@@ -140,4 +140,4 @@ If you find this extension useful, consider buying me a coffee!
 
 ## License
 
-[MIT](LICENSE) © Tae Ho Na
+[MIT](LICENSE)
